@@ -26,7 +26,7 @@
 - [x] 리딩버디/twin-choice Supabase 무료 슬롯 확인 → 2/2 소진 확인, 리딩버디 프로젝트 공유로 결정 (2026-09-14)
 - [x] `docs/{PRD,BRIEF,STORIES,ARCHITECTURE}.md` + 이 파일 스캐폴딩 (2026-09-14)
 - [x] 리딩버디 CLAUDE.md/인증 코드를 먼저 읽고 재사용 가능한 부분 목록화 (2026-09-14) — 결과는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 4장·6장, 요약은 바로 아래 섹션
-- [x] `supabase/migrations/0001_vocab_schema.sql`~`0003_vocab_grants.sql` 작성 완료 (2026-09-14) — **아직 실제 DB에는 미적용**. 사용자가 리딩버디 Supabase 프로젝트 SQL Editor에서 0001→0002→0003 순서대로 직접 실행해야 반영됨(리딩버디 관례 그대로, `supabase db push` 아님). 0002 실행 후 select 테스트로 anon/authenticated 접근이 되는지 확인 — 안 되면 0003 실행
+- [x] `supabase/migrations/0001_vocab_schema.sql`~`0003_vocab_grants.sql` 작성 완료 (2026-09-14). **0001/0002는 사용자가 리딩버디 Supabase SQL Editor에서 실행 완료(2026-09-14, 에러 없음)** — `vocab_words`/`vocab_batches`/`vocab_batch_items`/`vocab_attempts` 테이블 + RLS 정책 적용됨. `0003_vocab_grants.sql`은 아직 미실행 — 앱 코드에서 실제 쿼리 시 `permission denied`가 나면 그때 실행(Phase 1 코드 작성 단계에서 확인)
 - [x] 리딩버디 `.env.local`에서 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` / `CHILD_AUTH_SECRET`을 그대로 복사해 `.env.local` 생성 완료 (2026-09-14). `AZURE_DOCUMENT_INTELLIGENCE_*`도 리딩버디 리소스를 우선 재사용하도록 반영. `AZURE_STORAGE_*`(Blob)는 아직 빈 값 — 컨테이너 생성 후 채울 것
 - [ ] Azure Blob Storage 컨테이너(비공개) 생성 + SAS 토큰 발급 API
 - [ ] 학원 단어장 사진 1~2장으로 Document Intelligence 모델(`prebuilt-layout` vs `prebuilt-read`) 선택 테스트 — 리딩버디 `reading-buddy-docintel` 리소스 재사용 여부도 이때 결정
