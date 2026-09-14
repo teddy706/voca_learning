@@ -32,14 +32,14 @@
 - [x] `supabase/migrations/0001_vocab_schema.sql`~`0003_vocab_grants.sql` 작성 완료 (2026-09-14). **0001/0002는 사용자가 리딩버디 Supabase SQL Editor에서 실행 완료(2026-09-14, 에러 없음)** — `vocab_words`/`vocab_batches`/`vocab_batch_items`/`vocab_attempts` 테이블 + RLS 정책 적용됨. `0003_vocab_grants.sql`은 아직 미실행 — 앱 코드에서 실제 쿼리 시 `permission denied`가 나면 그때 실행(Phase 1 코드 작성 단계에서 확인)
 - [x] 리딩버디 `.env.local`에서 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` / `CHILD_AUTH_SECRET`을 그대로 복사해 `.env.local` 생성 완료 (2026-09-14). `AZURE_DOCUMENT_INTELLIGENCE_*`도 리딩버디 리소스를 우선 재사용하도록 반영. `AZURE_STORAGE_*`(Blob)는 아직 빈 값 — 컨테이너 생성 후 채울 것
 - [x] Azure Blob Storage 계정/컨테이너 생성 완료 (2026-09-14) — 계정 `vocakokphotos`, 컨테이너 `vocab-photos`(비공개, public access off), `RG-reading-buddy`/Korea Central, Standard_LRS/Hot. 값은 `.env.local`에 반영됨. **SAS 토큰 발급 API는 아직 미구현**(Phase 1 코드 작성 단계, 2번 항목)
-- [x] **CSV 일괄 가져오기 완료 (2026-09-14)** — `scripts/import_vocab_csv.py`로 `MP3_stt/voca_mp3/*_review.csv`(능률보카 중등기본 DAY 01~50) 전체를 두 자녀 모두에게 등록. 결과: 자녀당 고유 단어 876개, `vocab_batches` 100개(50일×2명), `vocab_batch_items` 1752개. 재실행해도 안전(이미 있는 배치는 건너뜀). `permission denied` 없이 service_role 기본 권한으로 바로 됨 — `0003_vocab_grants.sql`은 결국 불필요했음(그래도 안전장치로 남겨둠)
+- [x] **CSV 일괄 가져오기 완료 (2026-09-14, 2026-09-14 캐릭터 4명으로 확장)** — `scripts/import_vocab_csv.py`로 `MP3_stt/voca_mp3/*_review.csv`(능률보카 중등기본 DAY 01~50) 전체를 이 family의 role=child 프로필 **전원**(고아린/황유니/아빠/정보라, 4명)에게 등록. 결과: 캐릭터당 고유 단어 876개, `vocab_batches` 200개(50일×4명), `vocab_batch_items`/`vocab_words` 3504개. 하드코딩된 자녀 목록 대신 family_id로 role=child를 동적 조회하도록 스크립트를 고쳐서, 앞으로 새 캐릭터가 생겨도 재실행만 하면 자동으로 포함된다. 재실행해도 안전(이미 있는 배치는 건너뜀). `permission denied` 없이 service_role 기본 권한으로 바로 됨 — `0003_vocab_grants.sql`은 결국 불필요했음(그래도 안전장치로 남겨둠)
 - [보류] 학원 단어장 사진 1~2장으로 Document Intelligence 모델(`prebuilt-layout` vs `prebuilt-read`) 선택 테스트 — **이번 Phase에서 제외**(위 "단어 등록 경로" 표 참고). 학원이 다른 책으로 바뀌거나 사진으로만 얻을 수 있는 단어장이 생기면 재검토
 
-### 실제 계정 정보 (2026-09-14 확인 — 테스트/시딩 데이터와 혼동 주의)
-리딩버디 공유 Supabase 프로젝트의 `profiles` 테이블에는 개발 중 만들어진 테스트 데이터도 섞여 있다(다른 family의 "민준", 같은 family인데 role이 잘못 들어간 "아빠", 그리고 "정보라" 등 — 실제 자녀인지 불확실). **이 앱이 다루는 실제 자녀는 아래 둘뿐이다**:
-- `family_id = d60d0acc-88b4-41ce-940b-b2f9fe375932`
-- 자녀 고아린 (`id = 62f98c6a-2b80-4bb2-bb09-e2c6c3f223e2`), 황유니 (`id = 8e0cd81f-47d9-42ff-8b08-f80aae9bef93`)
-새 스크립트나 시드 데이터를 만들 때 이 ID를 하드코딩할 경우, "정보라"/"아빠" 같은 다른 프로필에 실수로 데이터를 넣지 않도록 항상 이 목록과 대조할 것.
+### 실제 계정 정보 (2026-09-14 확인, 2026-09-14 정정)
+리딩버디 공유 Supabase 프로젝트의 `profiles`에는 다른 family의 "민준" 같은 진짜 데모 데이터도 있지만, **`family_id = d60d0acc-88b4-41ce-940b-b2f9fe375932` 안의 role=child 4명은 전부 실제로 쓰는 캐릭터**다 — 처음엔 "아빠"(role=child)와 "정보라"를 테스트 데이터로 오판해서 CSV 가져오기 대상에서 뺐었는데, 사용자가 확인해준 바로는 아빠가 본인도 플레이하려고 일부러 만든 캐릭터였다(정정: 2026-09-14).
+- 고아린(`62f98c6a-2b80-4bb2-bb09-e2c6c3f223e2`), 황유니(`8e0cd81f-47d9-42ff-8b08-f80aae9bef93`) — 쌍둥이 본인
+- 아빠(`4aa2edb3-3760-4bed-a4bd-3af8ef405d71`, role=child — 부모 계정 "아빠"와는 별개 프로필), 정보라(`1397242a-aff7-4da5-8d46-74d9e37793a6`)
+- **교훈**: `role=child` 프로필을 보고 "이름이 이상하니 테스트 데이터일 것"이라고 넘겨짚지 말 것 — 확실치 않으면 하드코딩으로 제외하지 말고 사용자에게 먼저 물어볼 것. `scripts/import_vocab_csv.py`는 이제 하드코딩 목록이 아니라 family_id로 role=child를 동적 조회하므로, 새 캐릭터가 생겨도 자동으로 포함된다.
 
 ### 리딩버디에서 확인한 재사용 자산 (2026-09-14 코드 확인 완료)
 아래 파일은 **재작성하지 않고 그대로 복사**해 온다 (자세한 표는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 4장):
@@ -77,6 +77,7 @@ OCR은 `src/lib/documentIntelligence.ts`의 `analyzeImage()` REST 폴링 패턴�
 - `/check`, `/check/[batchId]`, 그리고 `/api/vocab-attempts`·`/api/vocab-stars`가 전부 이 함수로 권한을 확인하도록 바뀜(기존 `requireChildProfile()`/`requireChildProfileForApi()` 직접 호출은 이 경로에서는 더 안 씀 — 로그인 여부 확인만 `requireProfile()`로 유지).
 - `/profiles`의 자녀 카드 아래에 "점검 미리보기" 링크 추가 → `/check?childId={id}`로 바로 진입.
 - ⚠️ 이후 이 앱에 자녀 전용 라우트를 새로 추가할 때는 `requireChildProfile()`을 그대로 쓸지, `resolveActingChild` 패턴으로 부모 접근도 허용할지 매번 판단할 것 — 기본값은 후자(부모도 볼 수 있게) 쪽으로 통일하는 게 일관적이다.
+- **(2026-09-14 추가)** 사용자가 실제로 원한 건 이 미리보기 링크보다는, **"아빠"를 정식 role=child 캐릭터로 만들어서 일반 PIN 로그인으로 들어가는 것**이었다(실제로 이미 그렇게 만들어져 있었음 — 위 "실제 계정 정보" 정정 참고). 미리보기 링크는 계속 남겨두되(부모가 PIN 없이 훑어볼 때 유용), 캐릭터 프로필 자체를 우선하는 게 이 사용자의 실제 사용 패턴이라는 걸 기억할 것.
 
 ### 앱 스캐폴딩 현황 (2026-09-14)
 Next.js 14.2.35(App Router) + TS + Tailwind로 초기화, `npm install`/`npm run build`/`npx tsc --noEmit` 전부 통과 확인. 만든 것:

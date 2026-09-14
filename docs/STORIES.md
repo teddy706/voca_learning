@@ -135,6 +135,6 @@
 - 근거: [PRD.md](PRD.md) 9장 열린 질문
 
 ### US-6.4 Supabase upsert 스크립트
-- [x] [`scripts/import_vocab_csv.py`](../scripts/import_vocab_csv.py) 작성 및 실행 완료 (2026-09-14) — `MP3_stt/voca_mp3/*_review.csv` 50개 파일을 읽어 두 자녀(고아린, 황유니) 모두에게 `vocab_batches`(status='confirmed')/`vocab_words`/`vocab_batch_items`로 upsert. 결과: 자녀당 고유 단어 876개, 배치 100개, batch_item 1752개. 재실행해도 안전(idempotent).
+- [x] [`scripts/import_vocab_csv.py`](../scripts/import_vocab_csv.py) 작성 및 실행 완료 (2026-09-14, 이후 캐릭터 4명으로 확장) — `MP3_stt/voca_mp3/*_review.csv` 50개 파일을 읽어 이 family의 role=child 캐릭터 전원(고아린/황유니/아빠/정보라)에게 `vocab_batches`(status='confirmed')/`vocab_words`/`vocab_batch_items`로 upsert. 결과: 캐릭터당 고유 단어 876개, 배치 200개, batch_item 3504개. 하드코딩 목록 대신 family_id로 role=child를 동적 조회 — 재실행해도 안전(idempotent)하고 새 캐릭터도 자동 포함.
 - 구현 메모: 원본 CSV 일부(DAY_10 등)에 (영어,한글) 완전 동일 중복 행이 남아있어 `ON CONFLICT` 에러가 났음 — 스크립트가 파싱 단계에서 완전 동일 쌍만 제거하도록 방어 처리함.
 - 근거: [PRD.md](PRD.md) 4.7 흐름 4단계, 4.8

@@ -29,14 +29,12 @@ import urllib.request
 SOURCE_DIR = os.path.join(os.path.dirname(__file__), "..", "voca_mp3")
 CSV_GLOB = os.path.join(SOURCE_DIR, "*_review.csv")
 
-# 2026-09-14 사용자 확인: 실제 쌍둥이 자녀 프로필(리딩버디 공유 Supabase 프로젝트의 profiles 테이블).
-# 이 목록에 없는 프로필(예: 테스트/시딩 데이터로 보이는 "아빠"(role=child), "정보라", 다른 family의
-# "민준")은 의도적으로 제외했다 — 실수로 그쪽에 데이터를 넣지 않기 위해 하드코딩으로 고정한다.
+# 2026-09-14 확인: 이 family_id 안의 role=child 프로필은 전부 실제로 쓰이는 "캐릭터"다 —
+# 처음엔 고아린/황유니만 쌍둥이 본인이고 "아빠"(role=child)·"정보라"는 테스트/시딩 데이터로
+# 보여서 하드코딩으로 제외했었는데, 사용자가 확인해준 바로는 아빠가 본인도 플레이해볼 캐릭터로
+# 일부러 만든 것이었다. 그래서 하드코딩 목록 대신 이 family의 role=child 전체를 매번 동적으로
+# 조회한다 — 다른 family(예: 리딩버디 개발용 데모 "민준")는 family_id로 여전히 걸러진다.
 FAMILY_ID = "d60d0acc-88b4-41ce-940b-b2f9fe375932"
-CHILDREN = [
-    {"id": "62f98c6a-2b80-4bb2-bb09-e2c6c3f223e2", "name": "고아린"},
-    {"id": "8e0cd81f-47d9-42ff-8b08-f80aae9bef93", "name": "황유니"},
-]
 
 DAY_RE = re.compile(r"DAY_(\d+)")
 
@@ -160,6 +158,12 @@ def import_day(base_url, service_key, csv_path, child):
           (f", 매칭 실패 {missing}개" if missing else ""))
 
 
+def fetch_children(base_url, service_key):
+    path = f"profiles?family_id=eq.{FAMILY_ID}&role=eq.child&select=id,name&order=created_at"
+    rows = supabase_request(base_url, service_key, "GET", path)
+    return [{"id": r["id"], "name": r["name"]} for r in rows]
+
+
 def main():
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env.local")
     env = load_env_local(env_path)
@@ -172,9 +176,14 @@ def main():
     if not csv_files:
         sys.exit(f"{CSV_GLOB} 에서 CSV를 찾지 못했습니다.")
 
-    print(f"{len(csv_files)}개 DAY 파일, {len(CHILDREN)}명 자녀 대상으로 가져오기 시작")
+    children = fetch_children(base_url, service_key)
+    if not children:
+        sys.exit(f"family_id={FAMILY_ID}에 role=child 프로필이 없습니다.")
+
+    print(f"{len(csv_files)}개 DAY 파일, {len(children)}명 캐릭터 대상으로 가져오기 시작: "
+          + ", ".join(c["name"] for c in children))
     for csv_path in csv_files:
-        for child in CHILDREN:
+        for child in children:
             import_day(base_url, service_key, csv_path, child)
 
 

@@ -65,7 +65,7 @@
 - Supabase 무료 슬롯 확인 완료(2/2 소진 → 리딩버디 프로젝트 공유로 확정, [PRD.md](PRD.md) 4.1.1).
 - `vocab_words`/`vocab_batches`/`vocab_batch_items`/`vocab_attempts` 스키마 + RLS 마이그레이션을 리딩버디 Supabase 프로젝트에 적용 완료(에러 없음).
 - Azure Blob Storage 계정(`vocakokphotos`)/컨테이너(`vocab-photos`, 비공개) 생성 완료, Document Intelligence는 리딩버디 기존 리소스 재사용 결정. `.env.local` 구성 완료. **단, 사진 OCR 등록 자체는 이번 Phase에서 제외하기로 해서 이 인프라는 당장 쓰지 않는다.**
-- **단어 등록 완료**: 학원 시험 범위가 능률보카 중등기본과 같아서, 오디오 STT+PDF 정답지로 만든 CSV(`MP3_stt/voca_mp3/*_review.csv`, DAY 01~50)를 `scripts/import_vocab_csv.py`로 실제 쌍둥이 자녀(고아린, 황유니) 둘 다에게 일괄 등록 완료 — 자녀당 고유 단어 876개, 배치 100개.
+- **단어 등록 완료**: 학원 시험 범위가 능률보카 중등기본과 같아서, 오디오 STT+PDF 정답지로 만든 CSV(`MP3_stt/voca_mp3/*_review.csv`, DAY 01~50)를 `scripts/import_vocab_csv.py`로 이 가족의 캐릭터 4명(고아린, 황유니, 아빠, 정보라) 전원에게 일괄 등록 완료 — 캐릭터당 고유 단어 876개, 배치 200개.
 - 남은 Phase 1 항목: 점검 모드(타이핑/4지선다), 자녀 PIN 로그인 연동, 발음 재생, 반응형 확인.
 
 ## 9. 주요 리스크

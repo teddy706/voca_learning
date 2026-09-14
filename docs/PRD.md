@@ -297,7 +297,7 @@ create index vocab_attempts_family_id_idx on vocab_attempts(family_id);
 
 **결정**: 4.7의 CSV가 능률보카 중등기본 DAY 01~50 전체(50일치)로 완성되면서, 4.2(사진 촬영 → OCR)의 등록 경로가 이번 Phase에는 필요 없어졌다. 학원이 내주는 단어 시험이 우연히 이 시판 교재와 같아서, 사진을 찍어 OCR로 다시 읽어낼 필요 없이 이미 확보한 CSV로 바로 등록할 수 있기 때문이다.
 
-- **적용 범위**: `scripts/import_vocab_csv.py`(이 저장소)를 실행해 두 자녀(고아린, 황유니) 모두에게 동일한 단어장을 등록 완료(2026-09-14) — 자녀당 고유 단어 876개, `vocab_batches` 100개(50일×2명), `vocab_batch_items` 1752개. 스크립트는 재실행해도 안전(이미 있는 `child_id`+제목 배치는 건너뜀).
+- **적용 범위**: `scripts/import_vocab_csv.py`(이 저장소)를 실행해 이 family의 role=child 캐릭터 전원(고아린·황유니·아빠·정보라, 4명)에게 동일한 단어장을 등록 완료(2026-09-14, 이후 아빠/정보라도 실제 캐릭터로 확인되어 확장) — 캐릭터당 고유 단어 876개, `vocab_batches` 200개(50일×4명), `vocab_batch_items`/`vocab_words` 3504개. 스크립트는 하드코딩 목록이 아니라 family_id로 role=child를 동적 조회하므로 재실행해도 안전하고, 새 캐릭터가 생겨도 자동 포함된다.
 - **4.2(사진 OCR 등록)는 제거가 아니라 보류**: 학원이 다른 책으로 바뀌거나, 앞으로 사진으로만 얻을 수 있는 새 단어장이 생기면 그때 다시 필요해진다. Azure Blob Storage(`vocakokphotos`/`vocab-photos`)와 Document Intelligence 리소스는 이미 만들어져 있으므로, 재검토 시점에는 API/UI 코드만 추가하면 된다(4.1.1, 4.2 참고) — 인프라를 다시 만들 필요는 없다.
 - **CSV 파서의 알려진 결함(4.7의 원본 CSV에 남아있음, `import_vocab_csv.py`가 임포트 시점에 방어)**: DAY_10 등 일부 파일에 (english, korean)이 완전히 동일한 행이 그대로 중복 저장돼 있었다(STT dedup 로직이 일부 파일엔 적용 안 됨) — 그대로 upsert하면 `ON CONFLICT DO UPDATE command cannot affect row a second time` 에러가 난다. `import_vocab_csv.py`는 파싱 단계에서 완전 동일한 (english, korean) 쌍만 제거하고 가져온다(같은 영어에 다른 뜻이 달린 행은 그대로 둠). 원본 CSV 자체를 고치는 것은 이 저장소가 아니라 `MP3_stt` 쪽 작업.
 - **데이터 품질**: `MP3_stt/VOCAB_AUDIT_REPORT.md`에 PDF 정답지 대조 결과 전체 일치율 86.2%로 기록돼 있다 — 완벽하지 않은 데이터라는 걸 인지하고 가져왔다(정확도를 더 높이는 건 이 저장소가 아니라 `MP3_stt`의 책임 범위, 9장 열린 질문 참고).
