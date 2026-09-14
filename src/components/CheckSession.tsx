@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { SessionSummary, type WrongWord } from "@/components/SessionSummary";
 
 export interface CheckWord {
   id: string;
@@ -14,13 +14,21 @@ type Feedback = { status: "correct" | "incorrect"; correctAnswer: string } | nul
 // 점검 모드 — 타이핑 응답 (PRD 4.3). 한글 단어를 순서대로 제시 → 영어 입력 → 즉시 채점
 // (서버가 trim + 대소문자 무시로 비교, /api/vocab-attempts 참고) → 오답은 정답을 보여준 뒤
 // "다음"을 눌러야 넘어간다(정답은 짧게 보여주고 자동으로 넘어감). 세션 끝나면 요약 + 오답 목록.
-export function CheckSession({ words }: { words: CheckWord[] }) {
+export function CheckSession({
+  batchId,
+  childId,
+  words,
+}: {
+  batchId: string;
+  childId: string;
+  words: CheckWord[];
+}) {
   const [index, setIndex] = useState(0);
   const [input, setInput] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [submitting, setSubmitting] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
-  const [wrongWords, setWrongWords] = useState<CheckWord[]>([]);
+  const [wrongWords, setWrongWords] = useState<WrongWord[]>([]);
 
   const current = words[index];
   const finished = index >= words.length;
@@ -33,6 +41,7 @@ export function CheckSession({ words }: { words: CheckWord[] }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          childId,
           wordId: current.id,
           userInput: input,
           mode: "check",
@@ -77,30 +86,15 @@ export function CheckSession({ words }: { words: CheckWord[] }) {
 
   if (finished) {
     return (
-      <div className="card text-center">
-        <p className="mb-2 text-lg font-bold">
-          {words.length}문제 중 {correctCount}개 정답!
-        </p>
-        {wrongWords.length > 0 && (
-          <div className="mt-4 text-left">
-            <p className="mb-2 font-bold text-soft">틀린 단어 다시 보기</p>
-            <ul className="flex flex-col gap-1">
-              {wrongWords.map((w) => (
-                <li key={w.id} className="flex justify-between border-b border-[#eee] py-1 text-sm">
-                  <span>{w.korean}</span>
-                  <span className="font-bold">{w.english}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <button type="button" onClick={restart} className="btn btn-primary mt-4 mb-0">
-          다시 점검하기
-        </button>
-        <Link href="/check" className="btn btn-outline mb-0 mt-3">
-          다른 단어장 고르기
-        </Link>
-      </div>
+      <SessionSummary
+        batchId={batchId}
+        childId={childId}
+        mode="typing"
+        total={words.length}
+        correctCount={correctCount}
+        wrongWords={wrongWords}
+        onRestart={restart}
+      />
     );
   }
 

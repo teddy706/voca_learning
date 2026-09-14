@@ -29,10 +29,16 @@ export default async function ProfilesPage() {
 
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {childProfiles.map((child) => (
-            <Link key={child.id} href={`/profiles/${child.id}/pin`} className="profile-card">
-              <Avatar emoji={child.avatar} size="lg" />
-              <span className="font-bold">{child.name}</span>
-            </Link>
+            <div key={child.id} className="flex flex-col items-center gap-1.5">
+              <Link href={`/profiles/${child.id}/pin`} className="profile-card mb-0">
+                <Avatar emoji={child.avatar} size="lg" />
+                <span className="font-bold">{child.name}</span>
+              </Link>
+              {/* PIN 없이 부모 계정으로 자녀 화면을 미리 써보는 경로 — src/lib/vocabAuth.ts 권한 모델 */}
+              <Link href={`/check?childId=${child.id}`} className="text-xs font-bold text-soft underline">
+                점검 미리보기
+              </Link>
+            </div>
           ))}
         </div>
 

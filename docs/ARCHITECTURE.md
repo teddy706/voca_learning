@@ -68,9 +68,11 @@ voca_learning/
 ├── scripts/
 │   └── import_vocab_csv.py  # 완료 — CSV → Supabase 일괄 가져오기, 재실행 안전
 ├── supabase/migrations/
-│   ├── 0001_vocab_schema.sql  # 적용 완료
-│   ├── 0002_vocab_rls.sql     # 적용 완료
-│   └── 0003_vocab_grants.sql  # 안전장치, 미적용(불필요했음)
+│   ├── 0001_vocab_schema.sql       # 적용 완료
+│   ├── 0002_vocab_rls.sql          # 적용 완료
+│   ├── 0003_vocab_grants.sql       # 안전장치, 미적용(불필요했음)
+│   ├── 0004_vocab_arrange_mode.sql # 적용 완료 — answer_mode에 'arrange' 추가
+│   └── 0005_vocab_stars.sql        # 적용 완료 — vocab_stars 테이블
 ├── voca_mp3/*_review.csv   # import_vocab_csv.py의 입력(mp3 원본은 gitignore)
 ├── test/stubs/server-only.ts
 ├── public/manifest.json    # icons: [] — 아직 아이콘 세트 없음(TODO)
@@ -80,21 +82,35 @@ voca_learning/
     │   ├── supabase/{client,server,admin}.ts  # 그대로 복사
     │   ├── childAuth.ts             # 그대로 복사(diff 없음 확인) — 절대 수정 금지, 4장 경고 참고
     │   ├── currentProfile.ts        # 그대로 복사
+    │   ├── vocabAuth.ts             # 이 앱 고유 — resolveActingChild(childId): 자녀 본인 또는 같은 가족 부모만 통과
+    │   ├── vocabBatch.ts            # getOwnedBatchWithWords/getChildWordPool — vocabAuth로 권한 확인 후 데이터 조회
+    │   ├── distractors.ts (+.test.ts) # 4지선다 디스트랙터 생성(순수 함수, PRD 4.3.1)
     │   └── types.ts                 # Profile(리딩버디와 공유) + Vocab* 타입(이 앱 고유)
     ├── components/
-    │   ├── Avatar.tsx               # emoji만 지원하도록 단순화
-    │   ├── LogoutButton.tsx
-    │   └── PinKeypad.tsx / PinEntry.tsx
+    │   ├── Avatar.tsx / LogoutButton.tsx / PinKeypad.tsx / PinEntry.tsx  # 인증 UI
+    │   ├── ReviewSession.tsx        # 복습(암기) 플래시카드, 채점 없음
+    │   ├── CheckSession.tsx         # 시험 도전 — 타이핑
+    │   ├── ChoiceSession.tsx        # 시험 도전 — 4지선다
+    │   ├── ArrangeSession.tsx       # 시험 도전 — 글자 배열(탭으로 타일 배치)
+    │   └── SessionSummary.tsx       # 3개 시험 유형 공용 결과 화면 — 만점이면 /api/vocab-stars 호출
     └── app/
         ├── layout.tsx / globals.css  # Pretendard 폰트 + app-shell/card/btn* 컴포넌트 클래스(리딩버디 포팅)
         ├── page.tsx                  # role별 리다이렉트(parent→/profiles, child→/home)
         ├── login/page.tsx            # 부모 이메일/비밀번호 로그인
-        ├── profiles/page.tsx         # 자녀 선택
+        ├── profiles/page.tsx         # 자녀 선택 + "점검 미리보기" 링크(부모용, PIN 없이 /check?childId=)
         ├── profiles/[id]/pin/page.tsx
-        ├── home/page.tsx             # 자녀 홈 — vocab_words/vocab_batches 개수 실조회(점검 모드는 미구현)
+        ├── home/page.tsx             # 자녀 홈 — vocab_words/vocab_batches 개수 실조회 + "점검 시작하기"
+        ├── check/page.tsx            # DAY(배치) 목록 — 자녀는 본인 것, 부모는 ?childId로 고른 자녀 것
+        ├── check/[batchId]/page.tsx  # 모드 허브(복습/시험 3종, 유형별 ⭐ 개수)
+        ├── check/[batchId]/review/page.tsx
+        ├── check/[batchId]/typing/page.tsx
+        ├── check/[batchId]/choice/page.tsx
+        ├── check/[batchId]/arrange/page.tsx
         └── api/
             ├── auth/{login,logout}/route.ts
-            └── children/[id]/pin/route.ts
+            ├── children/[id]/pin/route.ts
+            ├── vocab-attempts/route.ts   # 서버가 채점 authoritative, vocabAuth로 권한 확인
+            └── vocab-stars/route.ts      # 만점 시 별 카운터 증가, vocabAuth로 권한 확인
 ```
 
 관련 1회성 작업(오디오 STT/PDF 대조)은 이 저장소가 아니라 별도 작업 디렉터리 `/Users/gwanghee/Documents/110_Github/MP3_stt`에 있다 — 완성된 CSV를 `voca_mp3/`로 복사해와 `scripts/import_vocab_csv.py`가 Supabase에 반영했다(완료).
@@ -123,16 +139,24 @@ voca_learning/
 ### 이 앱에서 새로 만들 필요 없는 것
 - 회원가입(`/signup`), 자녀 프로필 생성(`/profiles/new`), 가족 코드 발급(`joinCode.ts`) — 계정/프로필은 리딩버디 쪽에서 이미 관리한다. 이 앱은 로그인(부모 이메일/비밀번호, 자녀 PIN)만 있으면 된다.
 
+### 부모의 "자녀 대신 접근" — `resolveActingChild` (2026-09-14 추가)
+`currentProfile.ts`의 `requireChildProfile()`/`requireChildProfileForApi()`는 "지금 세션이 정확히 그 자녀"인지만 본다. 점검 모드는 부모가 PIN 없이 자녀 화면을 미리 써볼 수 있어야 해서(사용자 요청), `src/lib/vocabAuth.ts`에 별도 헬퍼 `resolveActingChild(childId)`를 추가했다:
+- 요청자가 그 자녀 본인이면 통과.
+- 요청자가 부모면, `childId`가 같은 `family_id`의 `role='child'` 프로필인지 확인 후 통과.
+- 점검 관련 페이지(`/check`, `/check/[batchId]`, 그 하위 4종)와 API(`/api/vocab-attempts`, `/api/vocab-stars`)는 전부 이걸로 권한을 확인한다 — `requireChildProfile()`을 직접 쓰지 않는다.
+- 이 패턴은 리딩버디 RLS의 `my_role() = 'parent'` 조건(부모는 가족 전체 자녀 대신 쓰기 가능)을 애플리케이션 레벨에서 그대로 반영한 것이다. **자녀 전용 라우트를 새로 추가할 때마다 이 패턴을 쓸지 순수 `requireChildProfile()`을 쓸지 판단할 것** — 기본은 부모도 볼 수 있게(`resolveActingChild`) 통일하는 쪽.
+
 ## 5. 데이터 모델
 
-전체 스키마는 [PRD.md](PRD.md) 3장 참고. 핵심 테이블 4개, 모두 `vocab_` 접두사로 리딩버디 프로젝트에 추가:
+전체 스키마는 [PRD.md](PRD.md) 3장 참고. 핵심 테이블 5개, 모두 `vocab_` 접두사로 리딩버디 프로젝트에 추가:
 
 - `vocab_words` — 자녀별 캐논 단어 (family_id, child_id, korean, english; child_id+korean+english 유니크)
 - `vocab_batches` — 등록 배치(사진 1장 = 배치 1개), `status`: pending_review → confirmed
 - `vocab_batch_items` — 배치 ↔ 단어 N:M, 순서 보존 (family_id 없음, batch_id로 조인)
-- `vocab_attempts` — 점검/게임 공통 시도 기록 (`mode`: check/game, `answer_mode`: typing/choice)
+- `vocab_attempts` — 점검/게임 공통 시도 기록 (`mode`: check/game, `answer_mode`: typing/choice/**arrange** — 0004에서 추가)
+- `vocab_stars` — 시험 도전 만점 보상 카운터 (`child_id`+`batch_id`+`mode`당 누적, 0005에서 추가)
 
-4개 테이블 모두 `family_id`를 직접 들고 있다 — 리딩버디의 `reading_records` 등 기존 테이블과 동일한 비정규화 패턴(6장 참고). 통계/오답노트는 별도 테이블 없이 `vocab_attempts` 집계 뷰로 처리(가이드 2.4 원칙).
+전 테이블 `family_id`를 직접 들고 있다 — 리딩버디의 `reading_records` 등 기존 테이블과 동일한 비정규화 패턴(6장 참고). 통계/오답노트는 별도 테이블 없이 `vocab_attempts` 집계 뷰로 처리(가이드 2.4 원칙).
 
 ## 6. RLS 정책 (2026-09-14, 기존 헬퍼 함수 확인 후 확정)
 
@@ -143,6 +167,7 @@ voca_learning/
   - 부모 계정: 자기 가족(쌍둥이 둘 다)의 모든 행에 쓰기 가능.
   - 자녀 PIN 세션: **자기 자신의 `child_id`에만** 쓰기 가능 — 쌍둥이 형제/자매의 단어장을 서로 건드릴 수 없다.
 - `vocab_batch_items`는 `family_id`가 없으므로 `batch_id`로 `vocab_batches`를 조인해 같은 조건을 검사하는 정책을 쓴다.
+- `vocab_stars`도 같은 4개 테이블과 동일한 select/insert/update 정책(0005_vocab_stars.sql) — delete 정책은 없음(별을 지울 일이 없으므로).
 - 정확한 SQL은 [PRD.md](PRD.md) 4.1 참고.
 - 마이그레이션 적용 전 리딩버디 기존 테이블(`families`/`profiles` 등)에 이름 충돌/외래키 영향이 없는지 반드시 확인.
 
@@ -178,17 +203,18 @@ Phase 1/2 범위에는 실시간 동기화 요구사항이 없음(twin-choice의
 - Vercel 함수 리전을 Supabase/리딩버디와 동일하게 고정.
 - 발음 재생은 클라이언트 전용이라 서버 왕복 없음(Phase 1 기준).
 
-## 11. 테스트 (계획)
+## 11. 테스트
 
 - Vitest 인프라를 리딩버디/twin-choice에서 그대로 포팅.
-- 디스트랙터 생성 로직(4.3.1)은 순수 함수라 유닛 테스트로 커버하기 좋음 — 우선 대상.
+- `src/lib/distractors.test.ts` — 4지선다 디스트랙터 생성 로직(순수 함수, PRD 4.3.1) 유닛 테스트 완료(7개, 전부 통과).
 
 ## 12. 알려진 함정 (재발 방지용 기록)
 
 리딩버디 CLAUDE.md/코드에서 이 프로젝트에도 그대로 재발할 수 있는 것만 미리 옮겨둔다. 그 외 새로 겪는 함정은 실제로 발생하는 대로 이어서 채운다.
 
 - **`SUPABASE_SERVICE_ROLE_KEY`는 반드시 legacy JWT 형식**: Supabase 대시보드 API Keys 화면의 새 형식 secret key(`sb_secret_...`)를 넣으면 `admin.from(table).insert(...)` 같은 PostgREST 호출이 전부 `permission denied`로 막힌다. "Legacy anon, service_role API keys" 탭의 JWT를 리딩버디 `.env.local`에서 그대로 복사해 올 것(같은 프로젝트이므로 같은 값).
-- **"Automatically expose new tables"가 꺼져 있어 새 테이블은 GRANT를 기본으로 못 받는다**: 리딩버디는 `0006_grants.sql`의 `alter default privileges`로 이후 테이블에도 자동 적용되게 해뒀지만, 이건 그 SQL을 실행한 role 기준으로 적용되는 설정이라 **`vocab_*` 마이그레이션을 SQL Editor에서 실행한 뒤 실제로 anon/authenticated/service_role이 해당 테이블에 접근되는지(간단한 select 테스트) 반드시 확인**할 것 — 안 되면 `0006_grants.sql`과 같은 GRANT 문을 `vocab_*` 테이블에 명시적으로 한 번 더 실행한다.
+- **"Automatically expose new tables"가 꺼져 있어 새 테이블은 GRANT를 기본으로 못 받는다**: 리딩버디는 `0006_grants.sql`의 `alter default privileges`로 이후 테이블에도 자동 적용되게 해뒀지만, 이건 그 SQL을 실행한 role 기준으로 적용되는 설정이라 **`vocab_*` 마이그레이션을 SQL Editor에서 실행한 뒤 실제로 anon/authenticated/service_role이 해당 테이블에 접근되는지(간단한 select 테스트) 반드시 확인**할 것 — 안 되면 `0006_grants.sql`과 같은 GRANT 문을 `vocab_*` 테이블에 명시적으로 한 번 더 실행한다. **(2026-09-14 실측: 실제로는 문제없었다)** — `vocab_words`~`vocab_stars`(0001~0005) 전부 service_role/anon 접근이 기본으로 됐다. `0003_vocab_grants.sql`은 안전장치로 남겨두되 실행 안 해도 됨을 확인.
 - **`storage.objects`는 일반 SQL `delete`로 못 지운다**(`storage.protect_delete()` 트리거가 막음). Azure Blob은 이 트리거의 영향을 받지 않지만(Supabase Storage가 아니므로), 혹시 사진 캐시 등을 Supabase Storage에 놓게 되면 이 함정이 재발할 수 있음 — Storage REST API로 지울 것.
 - **자녀 로그인은 `CHILD_AUTH_SECRET`/`childProfileEmail()`이 리딩버디와 정확히 일치해야 동작**([4장](#4-인증-구조-2026-09-14-리딩버디-실제-코드-확인-완료) 참고) — 이 프로젝트에서 겪을 가능성이 가장 높은 함정이라 별도로 강조.
 - **마이그레이션은 `supabase db push`가 아니라 SQL Editor 수동 실행**으로 적용해왔다(리딩버디 관례 그대로 따름) — 새 마이그레이션을 추가할 때마다 "사용자가 SQL Editor에서 직접 실행해야 실제 DB에 반영됨"을 잊지 말 것.
+- **`npm run dev`가 떠 있는 상태에서 `npm run build`를 돌리면 `.next` 캐시가 깨진다** (2026-09-14 두 번 실제로 겪음): 둘 다 같은 `.next/` 디렉터리를 쓰는데 프로덕션 빌드가 그 안의 dev 전용 파일을 덮어써서, dev 서버가 `Cannot find module './NNN.js'`나 `Cannot read properties of null (reading 'useContext')` 같은 에러를 내며 죽는다. 이미 브라우저에 로드된 페이지는 옛 청크를 계속 참조하니 서버를 고쳐도 브라우저 쪽엔 강제 새로고침이 필요하다. **대응**: dev 서버가 떠 있는 동안에는 `npm run build`를 돌리지 말 것 — 코드 검증은 `npx tsc --noEmit` + `npx vitest run` + `npx next lint`로 충분하다(전부 `.next`를 건드리지 않음). 정말 프로덕션 빌드를 확인해야 하면 dev 서버를 먼저 멈추고, 빌드 후 다시 `rm -rf .next && npm run dev`로 깨끗하게 재시작할 것.
