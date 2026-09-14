@@ -46,6 +46,12 @@ body {
 @layer components {
   .app-shell {
     @apply mx-auto flex min-h-screen max-w-[480px] flex-col px-4 pb-24 pt-6 md:max-w-2xl md:px-8 lg:max-w-5xl;
+    /* viewport-fit=cover(layout.tsx)와 짝을 이룬다 — 노치/홈 인디케이터에 내용이 가리지 않게
+       기존 padding에 세이프 에어리어만큼을 더한다(PRD 4.5). env()가 없는 기기에서는 0이라 무해. */
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-top: calc(1.5rem + env(safe-area-inset-top));
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
   }
   .card {
     @apply mb-3.5 rounded-card border-2 border-ink bg-white p-5 shadow-card;
