@@ -25,10 +25,17 @@
 ## Phase 0 체크리스트 (착수 준비, Phase 1 시작 전 완료할 것)
 - [x] 리딩버디/twin-choice Supabase 무료 슬롯 확인 → 2/2 소진 확인, 리딩버디 프로젝트 공유로 결정 (2026-09-14)
 - [x] `docs/{PRD,BRIEF,STORIES,ARCHITECTURE}.md` + 이 파일 스캐폴딩 (2026-09-14)
-- [ ] 리딩버디 CLAUDE.md/인증 코드를 먼저 읽고 재사용 가능한 부분 목록화 (PIN 인증, 미들웨어 위치 등 — `Glob`으로 재귀 확인)
-- [ ] 리딩버디 Supabase 프로젝트에 `vocab_*` 마이그레이션 추가 — 기존 테이블 영향 없는지 확인 후 SQL Editor에서 실행
+- [x] 리딩버디 CLAUDE.md/인증 코드를 먼저 읽고 재사용 가능한 부분 목록화 (2026-09-14) — 결과는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 4장·6장, 요약은 바로 아래 섹션
+- [ ] 리딩버디 Supabase 프로젝트에 `vocab_*` 마이그레이션 추가 — 기존 테이블 영향 없는지 확인 후 SQL Editor에서 실행 (스키마는 [docs/PRD.md](docs/PRD.md) 3장, RLS는 4.1)
+- [ ] 리딩버디 `.env.local`에서 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`(legacy JWT 형식) / `CHILD_AUTH_SECRET`(자녀 로그인 재사용을 위해 **값이 정확히 같아야 함**)을 그대로 복사해 이 프로젝트 `.env.local`에 반영
 - [ ] Azure Blob Storage 컨테이너(비공개) 생성 + SAS 토큰 발급 API
-- [ ] 학원 단어장 사진 1~2장으로 Document Intelligence 모델(`prebuilt-layout` vs `prebuilt-read`) 선택 테스트
+- [ ] 학원 단어장 사진 1~2장으로 Document Intelligence 모델(`prebuilt-layout` vs `prebuilt-read`) 선택 테스트 — 리딩버디 `reading-buddy-docintel` 리소스 재사용 여부도 이때 결정
+
+### 리딩버디에서 확인한 재사용 자산 (2026-09-14 코드 확인 완료)
+아래 파일은 **재작성하지 않고 그대로 복사**해 온다 (자세한 표는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 4장):
+`src/lib/supabase/{client,server,admin}.ts`, `src/middleware.ts`, `src/lib/childAuth.ts`, `src/lib/currentProfile.ts`, `src/app/api/auth/{login,logout}/route.ts`, `src/app/api/children/[id]/pin/route.ts`.
+이미 존재하는 DB 자산(새로 안 만듦): `families`/`profiles` 테이블, RLS 헬퍼 함수 `public.my_family_id()`/`public.my_role()`/`public.my_profile_id()`(`0002_functions_triggers.sql`).
+OCR은 `src/lib/documentIntelligence.ts`의 `analyzeImage()` REST 폴링 패턴을 포팅(단, `prebuilt-layout` 지원은 아직 없어 필요 시 추가).
 
 ## Phase 1 진행 순서
 번호 순서대로 진행. 앞 번호가 안 끝났으면 뒷 번호에 먼저 손대지 말 것.
@@ -43,10 +50,14 @@
 - [ ] 9. 아이폰 미니/아이패드 미니 실기기 테스트(카메라, 레이아웃, PWA 설치)
 
 ## 데이터 모델
-전체 SQL은 [docs/PRD.md](docs/PRD.md) 3장 참고. 핵심: `vocab_words`(캐논, child_id+korean+english 유니크) / `vocab_batches`(등록 배치) / `vocab_batch_items`(N:M) / `vocab_attempts`(mode: check/game, answer_mode: typing/choice).
+전체 SQL은 [docs/PRD.md](docs/PRD.md) 3장 참고. 핵심: `vocab_words`(캐논, child_id+korean+english 유니크) / `vocab_batches`(등록 배치) / `vocab_batch_items`(N:M) / `vocab_attempts`(mode: check/game, answer_mode: typing/choice). 4개 테이블 모두 `family_id`를 직접 보관(리딩버디 기존 테이블과 동일 패턴, RLS를 `my_family_id()` 한 줄로 단순화하기 위함).
 
 ## Supabase/Azure 셋업 중 발견한 함정
-(비워두고 시작 — 실제로 겪는 대로 채운다)
+리딩버디에서 이 프로젝트에도 재발 가능성이 높은 것만 미리 옮겨둠 (전체 목록은 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 12장):
+- `SUPABASE_SERVICE_ROLE_KEY`는 반드시 legacy JWT 형식(`sb_secret_...` 새 형식 아님) — 아니면 admin 클라이언트의 PostgREST 호출이 전부 `permission denied`.
+- 이 프로젝트는 "Automatically expose new tables"가 꺼진 프로젝트에 새 테이블을 추가하는 것 — `vocab_*` 마이그레이션 실행 후 anon/authenticated/service_role이 실제로 접근되는지 select로 확인할 것. 안 되면 `0006_grants.sql`과 같은 GRANT를 다시 실행.
+- 자녀 로그인은 `CHILD_AUTH_SECRET`/`childProfileEmail()`이 리딩버디와 정확히 일치해야 동작 (위 참고).
+(그 외 새로 겪는 함정은 실제로 발생하는 대로 이어서 채운다)
 
 ## 참고 문서
 - [docs/PRD.md](docs/PRD.md) / [docs/BRIEF.md](docs/BRIEF.md) / [docs/STORIES.md](docs/STORIES.md) / [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)

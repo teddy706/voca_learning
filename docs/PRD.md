@@ -64,28 +64,32 @@
 -- 단어 은행 (자녀별 고유 단어 — 캐논 엔트리, 중복 등록 시 upsert)
 create table vocab_words (
   id uuid primary key default gen_random_uuid(),
-  child_id uuid not null references profiles(id),
+  family_id uuid not null references families(id) on delete cascade,
+  child_id uuid not null references profiles(id) on delete cascade,
   korean text not null,
   english text not null,
   created_at timestamptz not null default now(),
   unique (child_id, korean, english)
 );
+create index vocab_words_family_id_idx on vocab_words(family_id);
 
 -- 등록 배치 (사진 한 장 = 배치 하나)
 create table vocab_batches (
   id uuid primary key default gen_random_uuid(),
-  child_id uuid not null references profiles(id),
+  family_id uuid not null references families(id) on delete cascade,
+  child_id uuid not null references profiles(id) on delete cascade,
   title text,                     -- 예: "9/15 단어시험"
   source_image_url text,          -- Azure Blob Storage 경로(비공개 컨테이너, 접근은 서버 발급 SAS 토큰으로)
   status text not null default 'pending_review'
     check (status in ('pending_review', 'confirmed')), -- OCR 직후=pending, 사용자 확인 완료 시=confirmed (4.2.1)
   registered_at timestamptz not null default now()
 );
+create index vocab_batches_family_id_idx on vocab_batches(family_id);
 
 -- 배치 ↔ 단어 매핑 (N:M, 순서 보존)
 create table vocab_batch_items (
-  batch_id uuid not null references vocab_batches(id),
-  word_id uuid not null references vocab_words(id),
+  batch_id uuid not null references vocab_batches(id) on delete cascade,
+  word_id uuid not null references vocab_words(id) on delete cascade,
   position int not null,
   primary key (batch_id, word_id)
 );
@@ -93,20 +97,22 @@ create table vocab_batch_items (
 -- 스펠링 시도 기록 (점검 모드 + 게임 모드 공통)
 create table vocab_attempts (
   id uuid primary key default gen_random_uuid(),
-  word_id uuid not null references vocab_words(id),
-  child_id uuid not null references profiles(id),
+  family_id uuid not null references families(id) on delete cascade,
+  word_id uuid not null references vocab_words(id) on delete cascade,
+  child_id uuid not null references profiles(id) on delete cascade,
   mode text not null check (mode in ('check', 'game')),
   answer_mode text not null check (answer_mode in ('typing', 'choice')), -- 타이핑 입력 vs 유사 스펠링 보기 선택
   user_input text not null,          -- 두 방식 모두 최종 제출 문자열을 동일하게 저장(선택형도 고른 보기 텍스트)
   is_correct boolean not null,
   attempted_at timestamptz not null default now()
 );
+create index vocab_attempts_family_id_idx on vocab_attempts(family_id);
 ```
 
 - `mode`(check/game)와 `answer_mode`(typing/choice)는 서로 독립적인 축이다 — 점검 모드에서도, 게임 모드에서도 두 방식 다 쓸 수 있다.
-
 - `vocab_words`에 `unique(child_id, korean, english)`를 걸어 OCR로 같은 단어가 여러 번 등록돼도 자동 병합.
 - 오답노트/통계는 `vocab_attempts`를 집계하는 뷰로 처리(별도 통계 테이블 없이 — 가이드 2.4 "새 테이블 없이 기존 값으로 즉석 계산" 원칙).
+- **`family_id`를 `child_id`와 별도로 중복 저장(denormalize)하는 이유(2026-09-14, 리딩버디 실제 코드 확인 후 결정)**: 리딩버디의 `reading_records` 등 기존 테이블이 전부 이 패턴이고, RLS 정책도 이미 있는 `public.my_family_id()`/`public.my_role()`/`public.my_profile_id()` 헬퍼 함수로 `family_id = my_family_id() and (my_role()='parent' or child_id = my_profile_id())` 한 줄로 끝난다(4.1 참고). `family_id` 없이 `child_id`만 쓰면 부모가 "내 두 자녀 것 모두" 조회할 때마다 `child_id in (select id from profiles where family_id = my_family_id())` 서브쿼리가 필요해진다 — 기존 프로젝트 관례와 다르게 갈 이유가 없으므로 그대로 맞춘다.
 
 ---
 
@@ -143,13 +149,31 @@ create table vocab_attempts (
 | 수명주기 관리 | Blob Storage의 **Lifecycle Management**로 "N일 지난 사진은 Cool/Archive 티어로 자동 이동"(선택 사항, Phase 2 이후 고려) |
 | 접근 제어 | Blob 컨테이너는 비공개(Private)로 두고 **서버(API 라우트)에서만 SAS(공유 액세스 서명) 토큰을 발급**해 클라이언트가 짧은 시간 동안만 특정 사진에 접근하게 한다 |
 
-#### 마이그레이션/RLS 정책 메모 (같은 프로젝트 공유 반영)
+#### 마이그레이션/RLS 정책 메모 (2026-09-14, 리딩버디 실제 코드 확인 후 확정)
 
-- **마이그레이션 주의**: 리딩버디와 같은 Supabase 프로젝트를 쓰므로, `vocab_*` 테이블을 추가하는 마이그레이션이 리딩버디의 기존 테이블(`profiles` 등)에 영향을 주지 않는지 SQL Editor에서 실행하기 전 반드시 확인한다(가이드 3.4 원칙).
-- **RLS**: 단어 등록을 부모뿐 아니라 자녀도 할 수 있게 하므로, `vocab_*` 테이블의 RLS는 "현재 활성 프로필(부모 계정 또는 자녀 PIN 세션)의 `child_id`와 일치하는 행만 쓰기 가능"으로 스코프한다:
-  - 부모 계정: 자기 자녀 전체(쌍둥이 둘 다)의 `child_id`에 쓰기 가능.
-  - 자녀 PIN 세션: **자기 자신의 `child_id`에만** 쓰기 가능 — 쌍둥이 형제/자매의 단어장을 서로 건드릴 수 없게 막는다(리딩버디에 이미 있는 자녀별 스코프 패턴을 그대로 재사용 — 같은 프로젝트라 `profiles`/세션 구조가 사실상 동일).
+- **마이그레이션 주의**: 리딩버디와 같은 Supabase 프로젝트를 쓰므로, `vocab_*` 테이블을 추가하는 마이그레이션이 리딩버디의 기존 테이블(`families`/`profiles` 등)에 영향을 주지 않는지 SQL Editor에서 실행하기 전 반드시 확인한다(가이드 3.4 원칙). `create extension "pgcrypto"`는 이미 리딩버디 `0001_schema.sql`에서 실행돼 있으므로 우리 마이그레이션에서 다시 실행할 필요 없음(`if not exists`라 다시 실행해도 무해하긴 함).
+- **기존 RLS 헬퍼 함수를 그대로 재사용한다** — 리딩버디 `supabase/migrations/0002_functions_triggers.sql`에 이미 `public.my_profile_id()` / `public.my_family_id()` / `public.my_role()` (모두 `security definer`, `auth.uid()` 기준으로 현재 세션의 profile을 찾아줌)이 정의돼 있다. `vocab_*` 마이그레이션은 이 함수들을 새로 만들지 않고 그대로 참조만 한다.
+- **RLS 정책은 리딩버디 `reading_records`와 동일한 형태**로 4개 테이블(`vocab_words`/`vocab_batches`/`vocab_batch_items`/`vocab_attempts`) 모두에 적용한다:
+  ```sql
+  create policy vocab_words_select on vocab_words
+    for select using (family_id = public.my_family_id());
+  create policy vocab_words_insert on vocab_words
+    for insert with check (
+      family_id = public.my_family_id()
+      and (public.my_role() = 'parent' or child_id = public.my_profile_id())
+    );
+  -- update/delete도 insert와 동일한 using() 조건. vocab_batches/vocab_attempts도 형태 동일.
+  -- vocab_batch_items는 family_id가 없으므로 batch_id로 vocab_batches를 조인해 같은 조건을 검사.
+  ```
+  - 부모 계정: `my_role() = 'parent'`이므로 자기 가족(쌍둥이 둘 다)의 모든 행에 쓰기 가능.
+  - 자녀 PIN 세션: `my_role() = 'child'`이므로 `child_id = my_profile_id()`(자기 자신)인 행만 쓰기 가능 — 쌍둥이 형제/자매의 단어장을 서로 건드릴 수 없다.
 - Azure Blob의 사진 접근 제어(SAS 토큰)도 같은 `child_id` 스코프로 서버에서 발급 — 자녀 A의 세션으로 자녀 B의 사진 URL을 요청해도 SAS가 발급되지 않게 한다.
+
+#### ⚠️ 자녀 로그인 재사용 시 반드시 지켜야 할 것 (2026-09-14, `src/lib/childAuth.ts` 확인)
+
+리딩버디는 자녀 PIN 로그인을 "PIN + profileId + `CHILD_AUTH_SECRET`을 HMAC-SHA256으로 섞은 값"을 비밀번호로 하는 synthetic 이메일 계정(`child+{profileId}@child.reading-buddy.internal`)으로 구현했다. 이 앱은 **새 계정을 만드는 게 아니라 이미 존재하는 그 계정에 로그인**하는 것이므로:
+- `CHILD_AUTH_SECRET` 환경변수 값을 리딩버디와 **정확히 동일하게** 설정해야 한다. 값이 다르면 HMAC 결과(=비밀번호)가 달라져서 이미 있는 synthetic 계정에 로그인할 수 없다.
+- 이메일을 만드는 로직(`child+{profileId}@child.reading-buddy.internal`)도 **문자 그대로 동일하게** 재현해야 한다 — "reading-buddy" 부분을 이 프로젝트 이름으로 바꾸면 안 된다(실제 도메인이 아니라 내부 식별자 문자열이므로 바꿀 이유도 없다). 가장 안전한 방법은 이 함수를 새로 옮겨 적지 않고, 리딩버디의 `childAuth.ts`를 파일 그대로 복사해 오는 것.
 
 ### 4.2 OCR 파이프라인
 

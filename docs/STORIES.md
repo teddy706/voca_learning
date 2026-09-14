@@ -60,11 +60,13 @@
 
 ### US-3.1 자녀 PIN 프로필 로그인 재사용
 - [ ] 리딩버디의 부모 계정 + 자녀 PIN 프로필 인증을 코드/계정 모두 그대로 재사용한다(신규 가입 불필요).
-- 근거: [PRD.md](PRD.md) 4.1, 7장
+- 구현: 리딩버디 `src/lib/supabase/{client,server,admin}.ts`, `src/middleware.ts`, `src/lib/childAuth.ts`, `src/lib/currentProfile.ts`, `src/app/api/auth/{login,logout}/route.ts`, `src/app/api/children/[id]/pin/route.ts`를 그대로 복사. `CHILD_AUTH_SECRET` 값과 `childProfileEmail()` 이메일 포맷은 절대 변경 금지(리딩버디와 달라지면 기존 자녀 계정 로그인 불가).
+- 근거: [PRD.md](PRD.md) 4.1, 7장 / [ARCHITECTURE.md](ARCHITECTURE.md) 4장
 
 ### US-3.2 자녀 간 데이터 격리 (RLS)
 - [ ] 자녀 PIN 세션은 자기 자신의 `child_id` 행만 쓰기 가능하다(쌍둥이 형제/자매 단어장 상호 침범 방지).
-- 근거: [PRD.md](PRD.md) 4.1 RLS 정책 메모
+- 구현: 리딩버디 기존 헬퍼 함수 `public.my_family_id()`/`public.my_role()`/`public.my_profile_id()` 재사용(새로 안 만듦). `vocab_*` 4개 테이블 모두 `family_id` 컬럼 보유.
+- 근거: [PRD.md](PRD.md) 4.1 RLS 정책 메모 / [ARCHITECTURE.md](ARCHITECTURE.md) 6장
 
 ---
 
