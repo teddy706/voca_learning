@@ -65,3 +65,51 @@ export async function getWordMarks(
     .in("word_id", wordIds);
   return new Map((data ?? []).map((m) => [m.word_id, m.status as WordMarkStatus]));
 }
+
+export interface BatchHistorySummary {
+  known: number;
+  unknown: number;
+  stars: number;
+}
+
+/**
+ * 단어장 목록(/check) 카드에 보여줄 간략한 학습 이력 — 배치별로 "알아요/몰라요" 표시 개수와
+ * 시험 도전 3종 별 총합을 한 번에 집계한다. 배치가 많아도(최대 50개) 쿼리 3번으로 끝나게
+ * batch_id별로 순회하지 않고 한 번에 가져와 애플리케이션에서 묶는다.
+ */
+export async function getBatchHistorySummaries(
+  childId: string,
+  batchIds: string[]
+): Promise<Map<string, BatchHistorySummary>> {
+  const empty = new Map<string, BatchHistorySummary>();
+  if (batchIds.length === 0) return empty;
+
+  const supabase = createClient();
+
+  const [{ data: items }, { data: stars }] = await Promise.all([
+    supabase.from("vocab_batch_items").select("batch_id, word_id").in("batch_id", batchIds),
+    supabase.from("vocab_stars").select("batch_id, star_count").eq("child_id", childId).in("batch_id", batchIds),
+  ]);
+
+  const wordIds = Array.from(new Set((items ?? []).map((i) => i.word_id)));
+  const marks = await getWordMarks(childId, wordIds);
+
+  const summaries = new Map<string, BatchHistorySummary>(
+    batchIds.map((id) => [id, { known: 0, unknown: 0, stars: 0 }])
+  );
+
+  for (const item of items ?? []) {
+    const summary = summaries.get(item.batch_id);
+    const mark = marks.get(item.word_id);
+    if (!summary || !mark) continue;
+    if (mark === "known") summary.known += 1;
+    else summary.unknown += 1;
+  }
+
+  for (const star of stars ?? []) {
+    const summary = summaries.get(star.batch_id);
+    if (summary) summary.stars += star.star_count;
+  }
+
+  return summaries;
+}

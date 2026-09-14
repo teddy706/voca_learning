@@ -4,6 +4,7 @@ import { requireProfile } from "@/lib/currentProfile";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { BackLink } from "@/components/BackLink";
+import { getBatchHistorySummaries } from "@/lib/vocabBatch";
 import type { Profile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -17,15 +18,31 @@ async function BatchList({ childId }: { childId: string }) {
     .eq("status", "confirmed")
     .order("registered_at", { ascending: true });
 
+  const summaries = await getBatchHistorySummaries(
+    childId,
+    (batches ?? []).map((b) => b.id)
+  );
+
   return (
     <>
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {(batches ?? []).map((batch) => {
           const count = batch.vocab_batch_items?.[0]?.count ?? 0;
+          const summary = summaries.get(batch.id);
+          const hasHistory = !!summary && (summary.known > 0 || summary.unknown > 0 || summary.stars > 0);
           return (
-            <Link key={batch.id} href={`/check/${batch.id}`} className="card mb-0 flex items-center justify-between">
-              <span className="font-bold">{batch.title ?? "제목 없음"}</span>
-              <span className="text-sm text-soft">{count}개</span>
+            <Link key={batch.id} href={`/check/${batch.id}`} className="card mb-0 flex flex-col gap-1">
+              <span className="flex items-center justify-between">
+                <span className="font-bold">{batch.title ?? "제목 없음"}</span>
+                <span className="text-sm text-soft">{count}개</span>
+              </span>
+              {hasHistory && (
+                <span className="flex gap-2 text-xs font-bold text-soft">
+                  {summary!.stars > 0 && <span className="text-b">⭐ {summary!.stars}</span>}
+                  {summary!.known > 0 && <span className="text-a">✅ {summary!.known}</span>}
+                  {summary!.unknown > 0 && <span className="text-red-500">🤔 {summary!.unknown}</span>}
+                </span>
+              )}
             </Link>
           );
         })}
