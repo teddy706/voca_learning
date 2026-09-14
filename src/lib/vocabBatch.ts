@@ -57,12 +57,17 @@ export async function getWordMarks(
   wordIds: string[]
 ): Promise<Map<string, WordMarkStatus>> {
   if (wordIds.length === 0) return new Map();
+  // word_id를 전부 .in() 쿼리에 나열하는 방식이라, 아주 많은 단어(수백 개+)를 한 번에 넘기면
+  // URL이 너무 길어져 요청이 조용히 실패할 수 있다(2026-09-14 getBatchHistorySummaries에서
+  // 876개로 실제로 겪음 — 그쪽은 child_id 전체 조회로 바꿔서 고침). 이 함수는 배치 하나 분량
+  // (수십 개) 호출만 상정한다 — 더 많이 넘길 일이 생기면 child_id 전체 조회로 바꿀 것.
   const supabase = createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("vocab_word_marks")
     .select("word_id, status")
     .eq("child_id", childId)
     .in("word_id", wordIds);
+  if (error) console.error("getWordMarks 조회 실패:", error);
   return new Map((data ?? []).map((m) => [m.word_id, m.status as WordMarkStatus]));
 }
 
@@ -86,13 +91,23 @@ export async function getBatchHistorySummaries(
 
   const supabase = createClient();
 
-  const [{ data: items }, { data: stars }] = await Promise.all([
+  // 배치가 많으면(최대 50개) 단어도 수백~수천 개가 되는데, getWordMarks처럼 word_id를
+  // 전부 .in() 쿼리에 나열하면 URL이 너무 길어져 요청이 조용히 실패한다(876개 UUID ≈ 32,000자,
+  // 2026-09-14 실제로 겪음 — marks가 항상 빈 Map으로 돌아왔었다). 여기서는 word_id로 좁히지
+  // 않고 child_id 하나로만 vocab_word_marks 전체를 가져와(이 자녀의 단어 수만큼이 상한이라
+  // 어차피 크지 않다) 애플리케이션에서 batch_items와 조인한다.
+  const [itemsRes, marksRes, starsRes] = await Promise.all([
     supabase.from("vocab_batch_items").select("batch_id, word_id").in("batch_id", batchIds),
+    supabase.from("vocab_word_marks").select("word_id, status").eq("child_id", childId),
     supabase.from("vocab_stars").select("batch_id, star_count").eq("child_id", childId).in("batch_id", batchIds),
   ]);
+  if (itemsRes.error) console.error("getBatchHistorySummaries batch_items 조회 실패:", itemsRes.error);
+  if (marksRes.error) console.error("getBatchHistorySummaries word_marks 조회 실패:", marksRes.error);
+  if (starsRes.error) console.error("getBatchHistorySummaries stars 조회 실패:", starsRes.error);
 
-  const wordIds = Array.from(new Set((items ?? []).map((i) => i.word_id)));
-  const marks = await getWordMarks(childId, wordIds);
+  const items = itemsRes.data;
+  const stars = starsRes.data;
+  const marks = new Map((marksRes.data ?? []).map((m) => [m.word_id, m.status as WordMarkStatus]));
 
   const summaries = new Map<string, BatchHistorySummary>(
     batchIds.map((id) => [id, { known: 0, unknown: 0, stars: 0 }])

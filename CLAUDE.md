@@ -124,6 +124,7 @@ Next.js 14.2.35(App Router) + TS + Tailwind로 초기화, `npm install`/`npm run
 - 이 프로젝트는 "Automatically expose new tables"가 꺼진 프로젝트에 새 테이블을 추가하는 것인데, **실제로 겪어보니 문제없었다**(0001~0005 전부 GRANT 정상, `0003_vocab_grants.sql` 실행 불필요했음) — 그래도 새 `vocab_*` 마이그레이션을 또 추가하면 한 번은 select로 확인해볼 것.
 - 자녀 로그인은 `CHILD_AUTH_SECRET`/`childProfileEmail()`이 리딩버디와 정확히 일치해야 동작 (위 참고).
 - **`npm run dev`가 떠 있을 때 `npm run build`를 돌리면 `.next` 캐시가 깨져서 dev 서버가 500 에러를 낸다**(2026-09-14 두 번 겪음) — 코드 검증은 `tsc --noEmit`/`vitest run`/`next lint`로 하고, `npm run build`는 dev 서버를 멈춘 뒤에만 실행할 것. 이미 걸렸다면 dev 프로세스 종료 → `.next` 삭제 → `npm run dev` 재시작 + 브라우저 강제 새로고침.
+- **PostgREST `.in()` 필터에 UUID를 수백 개 이상 나열하면 요청이 조용히 실패한다**(2026-09-14 실제로 겪음 — `getBatchHistorySummaries`가 자녀 전체 단어 876개의 `word_id`를 `.in()`에 나열했다가 URL이 너무 길어져 매번 빈 결과를 돌려받았는데, supabase-js 응답의 `error`를 확인 안 해서 화면엔 "학습 이력 없음"으로만 보이고 원인을 알 수 없었다). **교훈 두 가지**: (1) `.in()`에 넘기는 배열이 배치 하나 분량(수십 개)을 넘어 자녀 전체 단어 수준(수백~수천 개)이 될 수 있으면, ID 목록으로 좁히지 말고 `child_id` 같은 이미 작은 컬럼으로만 필터링해서 통째로 가져온 뒤 애플리케이션에서 조인할 것. (2) supabase-js 호출은 항상 `{ data, error }`를 구조분해해서 `error`가 있으면 `console.error`로 남길 것 — `{ data }`만 꺼내 쓰면 이런 실패가 "결과가 0건"으로 위장돼 원인 진단이 훨씬 오래 걸린다.
 (그 외 새로 겪는 함정은 실제로 발생하는 대로 이어서 채운다)
 
 ## 참고 문서
