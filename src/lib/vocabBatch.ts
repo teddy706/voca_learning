@@ -47,3 +47,21 @@ export async function getChildWordPool(childId: string): Promise<string[]> {
   const { data } = await supabase.from("vocab_words").select("english").eq("child_id", childId);
   return (data ?? []).map((w) => w.english);
 }
+
+export type WordMarkStatus = "known" | "unknown";
+
+/** 복습 모드 "알아요/몰라요" 표시 — child_id+word_id당 최신 상태. 예전에 다른 배치에서
+ * 표시한 것도 그대로 살아있어서 "전에 알았다고 표기했다"는 걸 보여줄 수 있다. */
+export async function getWordMarks(
+  childId: string,
+  wordIds: string[]
+): Promise<Map<string, WordMarkStatus>> {
+  if (wordIds.length === 0) return new Map();
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("vocab_word_marks")
+    .select("word_id, status")
+    .eq("child_id", childId)
+    .in("word_id", wordIds);
+  return new Map((data ?? []).map((m) => [m.word_id, m.status as WordMarkStatus]));
+}

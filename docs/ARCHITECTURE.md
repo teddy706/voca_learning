@@ -72,7 +72,8 @@ voca_learning/
 │   ├── 0002_vocab_rls.sql          # 적용 완료
 │   ├── 0003_vocab_grants.sql       # 안전장치, 미적용(불필요했음)
 │   ├── 0004_vocab_arrange_mode.sql # 적용 완료 — answer_mode에 'arrange' 추가
-│   └── 0005_vocab_stars.sql        # 적용 완료 — vocab_stars 테이블
+│   ├── 0005_vocab_stars.sql        # 적용 완료 — vocab_stars 테이블
+│   └── 0006_vocab_word_marks.sql   # 적용 완료 — vocab_word_marks 테이블(복습 알아요/몰라요)
 ├── voca_mp3/*_review.csv   # import_vocab_csv.py의 입력(mp3 원본은 gitignore)
 ├── test/stubs/server-only.ts
 ├── public/manifest.json    # icons: [] — 아직 아이콘 세트 없음(TODO)
@@ -148,13 +149,14 @@ voca_learning/
 
 ## 5. 데이터 모델
 
-전체 스키마는 [PRD.md](PRD.md) 3장 참고. 핵심 테이블 5개, 모두 `vocab_` 접두사로 리딩버디 프로젝트에 추가:
+전체 스키마는 [PRD.md](PRD.md) 3장 참고. 핵심 테이블 6개, 모두 `vocab_` 접두사로 리딩버디 프로젝트에 추가:
 
 - `vocab_words` — 자녀별 캐논 단어 (family_id, child_id, korean, english; child_id+korean+english 유니크)
 - `vocab_batches` — 등록 배치(사진 1장 = 배치 1개), `status`: pending_review → confirmed
 - `vocab_batch_items` — 배치 ↔ 단어 N:M, 순서 보존 (family_id 없음, batch_id로 조인)
 - `vocab_attempts` — 점검/게임 공통 시도 기록 (`mode`: check/game, `answer_mode`: typing/choice/**arrange** — 0004에서 추가)
 - `vocab_stars` — 시험 도전 만점 보상 카운터 (`child_id`+`batch_id`+`mode`당 누적, 0005에서 추가)
+- `vocab_word_marks` — 복습 모드 "알아요/몰라요" 자기평가 (`child_id`+`word_id`당 최신 상태 하나, 0006에서 추가) — 채점 기록인 `vocab_attempts`와 별개 개념
 
 전 테이블 `family_id`를 직접 들고 있다 — 리딩버디의 `reading_records` 등 기존 테이블과 동일한 비정규화 패턴(6장 참고). 통계/오답노트는 별도 테이블 없이 `vocab_attempts` 집계 뷰로 처리(가이드 2.4 원칙).
 

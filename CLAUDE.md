@@ -60,6 +60,7 @@ OCR은 `src/lib/documentIntelligence.ts`의 `analyzeImage()` REST 폴링 패턴�
 - [x] 7. (추가 항목) 복습(암기) 모드 + 글자 배열 시험 유형 + 별 보상 — 2026-09-14 사용자 요청으로 범위 추가, 아래 참고
 - [x] 8. (추가 항목) 부모 계정으로 자녀 화면 미리보기(PIN 없이) — 2026-09-14 사용자 요청
 - [x] 9. (추가 항목) 모든 화면에 뒤로가기 버튼 — 2026-09-14 사용자 요청, `BackLink` 컴포넌트(리딩버디 포팅)
+- [x] 10. (추가 항목) 복습 모드 "알아요/몰라요" 표시 + 헷갈리는 단어만 다시 복습 — 2026-09-14 사용자 요청, 아래 참고
 
 ### 점검 모드 전면 재설계 (2026-09-14)
 최초엔 타이핑 응답만 만들었으나, 사용자가 실제로 써본 뒤 아래처럼 요구사항을 구체화해서 전면 재구성했다:
@@ -86,6 +87,13 @@ OCR은 `src/lib/documentIntelligence.ts`의 `analyzeImage()` REST 폴링 패턴�
 - 적용 위치: `/profiles/[id]/pin`(→`/profiles`), `/check`(역할/상태별로 `/home`·`/profiles`·`/check` 중 하나), `/check/[batchId]`(→`/check`), `/check/[batchId]/{review,typing,choice,arrange}`(→`/check/[batchId]`). 세션이 끝나기 전에도 항상 눌러서 나갈 수 있다.
 - **일부러 안 넣은 곳**: `/login`(더 갈 곳 없음), `/home`·`/profiles`(각 역할의 최상위 화면 — 이미 `LogoutButton`이 "나가기" 역할을 함). 이 두 곳에 억지로 뒤로가기를 넣는 게 오히려 어색하다고 판단 — 필요하다고 하면 추가.
 
+### 복습 모드 — "알아요/몰라요" 표시 + 헷갈리는 단어만 다시 복습 (2026-09-14)
+- 새 테이블 `vocab_word_marks`(`0006_vocab_word_marks.sql`, 적용 완료) — `child_id`+`word_id`당 최신 상태(`known`/`unknown`) 하나만 유지. `vocab_attempts`(채점 기록)와는 별개 개념 — 이건 자기평가.
+- `POST /api/vocab-word-marks` — `vocabAuth.resolveActingChild`로 권한 확인(부모도 자녀 대신 표시 가능), upsert.
+- `ReviewSession.tsx`: 카드를 뒤집으면 "🤔 몰라요"/"✅ 알아요" 버튼이 나타나고, 누르면 저장 후 자동으로 다음 단어로 넘어간다. **이전에 표시해둔 단어는 카드 우상단에 배지로 바로 보인다**("✅ 예전에 알아요" / "🤔 예전에 몰라요") — 뒤집기 전에도 보이므로 이미 아는 단어에 시간을 덜 쓸 수 있다.
+- 복습이 끝나면 "알아요 N개 · 헷갈려요 M개" 요약과 함께 **"헷갈리는 단어만 다시 복습"** 버튼이 나온다 — 이번 세션에서(또는 과거에) `unknown`으로 표시된 단어만 모아 처음부터 다시 도는 좁은 루프를 만들 수 있다.
+- `vocabBatch.ts`의 `getWordMarks(childId, wordIds)`가 배치 단어들의 현재 표시 상태를 한 번에 조회해온다.
+
 ### 앱 스캐폴딩 현황 (2026-09-14)
 Next.js 14.2.35(App Router) + TS + Tailwind로 초기화, `npm install`/`npm run build`/`npx tsc --noEmit` 전부 통과 확인. 만든 것:
 - **인프라**: `package.json`(리딩버디와 동일 핵심 의존성), `tsconfig.json`/`next.config.mjs`/`tailwind.config.ts`(자체 accent 컬러 `#4C6EF5`)/`postcss.config.mjs`/`.eslintrc.json`/`vitest.config.mts`/`vercel.json`(`regions: ["icn1"]`)/`.claude/launch.json`(dev 서버 프리뷰용)
@@ -103,7 +111,7 @@ Next.js 14.2.35(App Router) + TS + Tailwind로 초기화, `npm install`/`npm run
 - 배치 등록(upsert) 확인 UI — CSV 가져오기는 스크립트로 이미 끝냈으므로 앱 안에 등록 UI가 당장 필요 없음
 
 ## 데이터 모델
-전체 SQL은 [docs/PRD.md](docs/PRD.md) 3장 참고. 핵심: `vocab_words`(캐논, child_id+korean+english 유니크) / `vocab_batches`(등록 배치) / `vocab_batch_items`(N:M) / `vocab_attempts`(mode: check/game, answer_mode: **typing/choice/arrange** — `arrange`는 0004에서 추가) / `vocab_stars`(child_id+batch_id+mode당 누적 별 개수, 0005에서 추가). 전 테이블 `family_id`를 직접 보관(리딩버디 기존 테이블과 동일 패턴, RLS를 `my_family_id()` 한 줄로 단순화하기 위함).
+전체 SQL은 [docs/PRD.md](docs/PRD.md) 3장 참고. 핵심: `vocab_words`(캐논, child_id+korean+english 유니크) / `vocab_batches`(등록 배치) / `vocab_batch_items`(N:M) / `vocab_attempts`(mode: check/game, answer_mode: **typing/choice/arrange** — `arrange`는 0004에서 추가) / `vocab_stars`(child_id+batch_id+mode당 누적 별 개수, 0005) / `vocab_word_marks`(child_id+word_id당 최신 known/unknown 자기평가, 0006). 전 테이블 `family_id`를 직접 보관(리딩버디 기존 테이블과 동일 패턴, RLS를 `my_family_id()` 한 줄로 단순화하기 위함).
 
 ## Supabase/Azure 셋업 중 발견한 함정
 리딩버디에서 이 프로젝트에도 재발 가능성이 높은 것만 미리 옮겨둠 (전체 목록은 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 12장):
