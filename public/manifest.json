@@ -1,0 +1,10 @@
+{
+  "name": "단어콕",
+  "short_name": "단어콕",
+  "description": "사진/CSV로 등록하고 게임처럼 반복하는 영단어 스펠링 점검",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f9fc",
+  "theme_color": "#f7f9fc",
+  "icons": []
+}

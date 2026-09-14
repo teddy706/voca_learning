@@ -1,6 +1,6 @@
 # 아키텍처 문서 — 단어콕(가칭)
 
-> **주의**: 이 문서는 아직 계획 단계다(Phase 0, 코드 없음). 구현이 시작되면 **코드가 진실이라는 원칙**에 따라 이 문서를 실제 구현에 맞춰 갱신할 것 — 문서에 맞춰 코드를 짜맞추지 않는다([NEW_APP_TOKEN_EFFICIENCY_GUIDE.md](NEW_APP_TOKEN_EFFICIENCY_GUIDE.md) 4장 원칙).
+> **주의**: 2026-09-14 앱 스캐폴딩(인증 배관)까지는 as-built로 갱신됨. 점검 모드 등 이후 기능은 아직 계획 단계 — 구현될 때마다 **코드가 진실이라는 원칙**에 따라 이 문서를 실제 구현에 맞춰 갱신할 것([NEW_APP_TOKEN_EFFICIENCY_GUIDE.md](NEW_APP_TOKEN_EFFICIENCY_GUIDE.md) 4장 원칙).
 
 ## 1. 개요
 
@@ -52,30 +52,54 @@ scripts/import_vocab_csv.py (이 저장소, 완료·2026-09-14)
 | 테스트 | Vitest ^2.1.9 (리딩버디/twin-choice 인프라 재사용) |
 | PWA 매니페스트 | `public/manifest.json` + `public/icons/*`(192/512/maskable/apple-touch), `layout.tsx`의 `metadata.manifest`/`viewport` — 리딩버디와 동일 구조로 포팅 |
 
-## 3. 디렉터리 구조
+## 3. 디렉터리 구조 (2026-09-14, 앱 스캐폴딩 완료 — as-built)
 
 ```
 voca_learning/
 ├── CLAUDE.md
 ├── .env.local              # 실제 값(gitignored) — Supabase/Azure 키
 ├── .env.local.example      # 커밋된 템플릿
+├── .claude/launch.json     # dev 서버 프리뷰 설정
+├── vercel.json             # regions: ["icn1"]
+├── package.json / tsconfig.json / next.config.mjs / tailwind.config.ts / vitest.config.mts
 ├── docs/
-│   ├── PRD.md
-│   ├── BRIEF.md
-│   ├── STORIES.md
-│   ├── ARCHITECTURE.md
+│   ├── PRD.md / BRIEF.md / STORIES.md / ARCHITECTURE.md
 │   └── NEW_APP_TOKEN_EFFICIENCY_GUIDE.md
 ├── scripts/
-│   └── import_vocab_csv.py  # 완료(2026-09-14) — CSV → Supabase 일괄 가져오기, 재실행 안전
-├── supabase/
-│   └── migrations/
-│       ├── 0001_vocab_schema.sql  # 적용 완료
-│       ├── 0002_vocab_rls.sql     # 적용 완료
-│       └── 0003_vocab_grants.sql  # 안전장치, 미적용(불필요했음)
-└── src/                # 앱 코드 (아직 없음 — Phase 1 점검 모드부터 시작)
+│   └── import_vocab_csv.py  # 완료 — CSV → Supabase 일괄 가져오기, 재실행 안전
+├── supabase/migrations/
+│   ├── 0001_vocab_schema.sql  # 적용 완료
+│   ├── 0002_vocab_rls.sql     # 적용 완료
+│   └── 0003_vocab_grants.sql  # 안전장치, 미적용(불필요했음)
+├── voca_mp3/*_review.csv   # import_vocab_csv.py의 입력(mp3 원본은 gitignore)
+├── test/stubs/server-only.ts
+├── public/manifest.json    # icons: [] — 아직 아이콘 세트 없음(TODO)
+└── src/
+    ├── middleware.ts               # 리딩버디에서 diff 없이 그대로 복사
+    ├── lib/
+    │   ├── supabase/{client,server,admin}.ts  # 그대로 복사
+    │   ├── childAuth.ts             # 그대로 복사(diff 없음 확인) — 절대 수정 금지, 4장 경고 참고
+    │   ├── currentProfile.ts        # 그대로 복사
+    │   └── types.ts                 # Profile(리딩버디와 공유) + Vocab* 타입(이 앱 고유)
+    ├── components/
+    │   ├── Avatar.tsx               # emoji만 지원하도록 단순화
+    │   ├── LogoutButton.tsx
+    │   └── PinKeypad.tsx / PinEntry.tsx
+    └── app/
+        ├── layout.tsx / globals.css  # Pretendard 폰트 + app-shell/card/btn* 컴포넌트 클래스(리딩버디 포팅)
+        ├── page.tsx                  # role별 리다이렉트(parent→/profiles, child→/home)
+        ├── login/page.tsx            # 부모 이메일/비밀번호 로그인
+        ├── profiles/page.tsx         # 자녀 선택
+        ├── profiles/[id]/pin/page.tsx
+        ├── home/page.tsx             # 자녀 홈 — vocab_words/vocab_batches 개수 실조회(점검 모드는 미구현)
+        └── api/
+            ├── auth/{login,logout}/route.ts
+            └── children/[id]/pin/route.ts
 ```
 
-관련 1회성 작업(오디오 STT/PDF 대조)은 이 저장소가 아니라 별도 작업 디렉터리 `/Users/gwanghee/Documents/110_Github/MP3_stt`에 있다 — 완성된 CSV(`voca_mp3/*_review.csv`)를 이 저장소의 `scripts/import_vocab_csv.py`가 읽어 Supabase에 반영했다(완료).
+관련 1회성 작업(오디오 STT/PDF 대조)은 이 저장소가 아니라 별도 작업 디렉터리 `/Users/gwanghee/Documents/110_Github/MP3_stt`에 있다 — 완성된 CSV를 `voca_mp3/`로 복사해와 `scripts/import_vocab_csv.py`가 Supabase에 반영했다(완료).
+
+**검증 상태**: `npm run build` / `npx tsc --noEmit` 통과, `/login` 페이지 브라우저 렌더링 확인. 부모 이메일/PIN 로그인의 실제 동작은 자격 증명을 에이전트가 알 수 없어 미검증 — 사용자가 `npm run dev`로 직접 확인 필요.
 
 ## 4. 인증 구조 (2026-09-14, 리딩버디 실제 코드 확인 완료)
 

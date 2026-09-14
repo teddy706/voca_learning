@@ -51,11 +51,21 @@ OCR은 `src/lib/documentIntelligence.ts`의 `analyzeImage()` REST 폴링 패턴�
 번호 순서대로 진행. 앞 번호가 안 끝났으면 뒷 번호에 먼저 손대지 말 것. **사진 업로드/OCR 관련 항목은 이번 Phase 스코프에서 빠졌다** — 등록은 이미 `scripts/import_vocab_csv.py`로 끝났으므로, Phase 1의 남은 일은 "이미 등록된 단어로 점검하는 기능"부터다.
 - [x] 1. 리딩버디 Supabase 프로젝트에 vocab_ 스키마 추가 (vocab_words/batches/batch_items/attempts, answer_mode 포함) — 완료, 위 Phase 0 체크리스트 참고
 - [x] 1.5. CSV 일괄 가져오기로 단어 등록 완료 (사진 OCR 등록의 대체 경로) — 완료, 위 참고
+- [x] 1.7. **Next.js 앱 스캐폴딩 완료 (2026-09-14)** — 아래 "앱 스캐폴딩 현황" 참고
 - [ ] 2. 점검 모드 — 타이핑 응답(한글→영어 스펠링, 채점, 요약)
 - [ ] 3. 점검 모드 — 보기 선택 응답(디스트랙터 생성 로직 + 4지선다 UI)
-- [ ] 4. 자녀 PIN 프로필 로그인 연동(리딩버디 계정 그대로 재사용)
+- [~] 4. 자녀 PIN 프로필 로그인 연동(리딩버디 계정 그대로 재사용) — 코드는 포팅 완료(1.7 참고), **실제 계정으로 로그인 테스트는 아직 사용자 확인 필요**(비밀번호/PIN을 에이전트가 알 수 없음)
 - [ ] 5. 공통 `SpeakButton`(Web Speech API 발음 재생) 컴포넌트 + 점검 화면 적용
 - [ ] 6. 아이폰 미니/아이패드 미니 실기기에서 반응형 레이아웃·PWA 설치 확인(카메라 테스트는 제외 — 사진 등록 없음)
+
+### 앱 스캐폴딩 현황 (2026-09-14)
+Next.js 14.2.35(App Router) + TS + Tailwind로 초기화, `npm install`/`npm run build`/`npx tsc --noEmit` 전부 통과 확인. 만든 것:
+- **인프라**: `package.json`(리딩버디와 동일 핵심 의존성), `tsconfig.json`/`next.config.mjs`/`tailwind.config.ts`(자체 accent 컬러 `#4C6EF5`)/`postcss.config.mjs`/`.eslintrc.json`/`vitest.config.mts`/`vercel.json`(`regions: ["icn1"]`)/`.claude/launch.json`(dev 서버 프리뷰용)
+- **인증(리딩버디에서 그대로 복사, 4장 표 그대로)**: `src/lib/supabase/{client,server,admin}.ts`, `src/middleware.ts`, `src/lib/childAuth.ts`(diff 없음 확인), `src/lib/currentProfile.ts`, `src/app/api/auth/{login,logout}/route.ts`, `src/app/api/children/[id]/pin/route.ts`
+- **UI 컴포넌트(리딩버디 패턴 포팅, 사진 아바타 등 불필요한 부분은 단순화)**: `Avatar`(emoji만), `LogoutButton`, `PinKeypad`/`PinConfirmButton`/`PinDots`, `PinEntry`. `globals.css`의 `app-shell`/`card`/`input`/`btn*`/`profile-card` 컴포넌트 클래스도 색상만 바꿔 그대로 포팅(PRD 4.5 반응형/터치타겟 요건을 이미 만족하는 검증된 패턴)
+- **페이지**: `/`(role별 리다이렉트) → `/login`(부모 로그인) → `/profiles`(자녀 선택) → `/profiles/[id]/pin`(PIN) → `/home`(자녀 홈, `vocab_words`/`vocab_batches` 개수를 실제로 조회해 보여줌 — DB 연결까지 검증됨)
+- **브라우저 확인**: `/login` 페이지 렌더링 확인(스타일 정상 적용). **부모 실제 로그인·PIN 입력은 비밀번호/PIN을 에이전트가 모르므로 테스트 못 함 — 사용자가 직접 `npm run dev` 후 `http://localhost:3000`에서 로그인→프로필 선택→PIN 입력→홈까지 확인 필요**
+- **미완성/TODO**: `public/manifest.json`의 `icons: []`(아이콘 세트 없음, 리딩버디도 초기엔 이랬음 — 나중에 채울 것), 점검 모드 화면 자체는 아직 없음(다음 항목)
 
 ### 보류 (이번 Phase 제외, 필요해지면 재검토)
 - 사진 업로드(Blob) + Azure OCR 연동

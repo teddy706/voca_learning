@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f7f9fc;
+  --foreground: #232733;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-pretendard), -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Malgun Gothic", sans-serif;
+  touch-action: manipulation;
+}
+
+@keyframes shake {
+  10%,
+  90% {
+    transform: translateX(-2px);
+  }
+  20%,
+  80% {
+    transform: translateX(4px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-8px);
+  }
+  40%,
+  60% {
+    transform: translateX(8px);
+  }
+}
+
+/* 리딩버디 globals.css의 component 클래스를 그대로 포팅(2026-09-14) — 모바일 퍼스트 app-shell,
+   44pt+ 터치 타겟 버튼 등 이미 검증된 반응형 패턴을 다시 설계하지 않는다(PRD 4.5). 색상 토큰만
+   이 앱의 accent(#4C6EF5)로 교체. */
+@layer components {
+  .app-shell {
+    @apply mx-auto flex min-h-screen max-w-[480px] flex-col px-4 pb-24 pt-6 md:max-w-2xl md:px-8 lg:max-w-5xl;
+  }
+  .card {
+    @apply mb-3.5 rounded-card border-2 border-ink bg-white p-5 shadow-card;
+  }
+  .input {
+    @apply mb-2.5 w-full rounded-2xl border-2 border-[#eee] p-3.5 text-[15px] outline-none focus:border-accent;
+  }
+  .btn {
+    @apply mb-3 block w-full rounded-btn px-4 py-4 text-center text-[17px] font-bold transition-transform active:scale-[0.97] disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-2 border-ink bg-accent text-white;
+  }
+  .btn-outline {
+    @apply border-2 border-ink bg-white text-ink;
+  }
+  .btn-ghost {
+    @apply bg-transparent p-2.5 text-center font-medium text-soft;
+  }
+  .profile-card {
+    @apply flex flex-col items-center gap-2 rounded-card border-2 border-ink bg-white p-5 text-center shadow-card transition-transform active:scale-95;
+    touch-action: manipulation;
+  }
+}
