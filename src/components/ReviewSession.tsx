@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { speakEnglish } from "@/lib/speech";
+import { isSpeechMuted, setSpeechMuted, speakEnglish } from "@/lib/speech";
 
 export interface ReviewWord {
   id: string;
@@ -31,6 +31,19 @@ export function ReviewSession({
     () => new Map(words.filter((w) => w.mark).map((w) => [w.id, w.mark as "known" | "unknown"]))
   );
   const [saving, setSaving] = useState(false);
+  const [muted, setMuted] = useState(false);
+
+  // localStorage는 서버 렌더링 시 접근 불가하므로 마운트 후에 실제 저장값을 읽어온다
+  // (초기값 false로 렌더링 후 바뀌어도 화면 깜빡임 정도라 무해함).
+  useEffect(() => {
+    setMuted(isSpeechMuted());
+  }, []);
+
+  function toggleMuted() {
+    const next = !muted;
+    setMuted(next);
+    setSpeechMuted(next);
+  }
 
   const current = sessionWords[index];
   const finished = index >= sessionWords.length;
@@ -114,9 +127,20 @@ export function ReviewSession({
 
   return (
     <div>
-      <p className="mb-1 text-center text-sm text-soft">
-        {index + 1} / {sessionWords.length}
-      </p>
+      <div className="mb-1 flex items-center justify-center gap-2">
+        <p className="text-center text-sm text-soft">
+          {index + 1} / {sessionWords.length}
+        </p>
+        <button
+          type="button"
+          onClick={toggleMuted}
+          aria-pressed={muted}
+          aria-label={muted ? "발음 재생 켜기" : "발음 재생 끄기"}
+          className="rounded-full border-2 border-ink bg-white px-2 py-0.5 text-sm leading-none"
+        >
+          {muted ? "🔇" : "🔊"}
+        </button>
+      </div>
 
       <button
         type="button"
