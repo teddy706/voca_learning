@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { PinEntry } from "@/components/PinEntry";
 import { BackLink } from "@/components/BackLink";
+import { getAvatarPhotoUrl } from "@/lib/avatarPhoto";
 
 export const dynamic = "force-dynamic";
 
@@ -13,20 +14,21 @@ export default async function ProfilePinPage({ params }: { params: { id: string 
   const supabase = createClient();
   const { data: child } = await supabase
     .from("profiles")
-    .select("id, name, avatar")
+    .select("id, name, avatar, avatar_photo_path")
     .eq("id", params.id)
     .eq("family_id", requester.family_id)
     .eq("role", "child")
     .maybeSingle();
 
   if (!child) notFound();
+  const photoUrl = await getAvatarPhotoUrl(supabase, child.avatar_photo_path);
 
   return (
     <div className="app-shell justify-center">
       <div className="mx-auto w-full max-w-sm">
         <BackLink href="/profiles" />
         <div className="mb-6 flex flex-col items-center gap-3">
-          <Avatar emoji={child.avatar} size="lg" />
+          <Avatar emoji={child.avatar} photoUrl={photoUrl} size="lg" />
           <h1 className="text-2xl font-bold">{child.name}</h1>
           <p className="text-sm text-soft">PIN 4자리를 입력해주세요</p>
         </div>

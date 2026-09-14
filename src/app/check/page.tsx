@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { BackLink } from "@/components/BackLink";
 import { getBatchHistorySummaries } from "@/lib/vocabBatch";
+import { getAvatarPhotoUrls } from "@/lib/avatarPhoto";
 import type { Profile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +83,12 @@ export default async function CheckBatchListPage({ searchParams }: { searchParam
       .eq("role", "child")
       .order("created_at", { ascending: true });
 
+    const childProfiles = (children ?? []) as Profile[];
+    const photoUrls = await getAvatarPhotoUrls(
+      supabase,
+      childProfiles.map((c) => c.avatar_photo_path)
+    );
+
     return (
       <div className="app-shell">
         <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
@@ -89,9 +96,13 @@ export default async function CheckBatchListPage({ searchParams }: { searchParam
           <h1 className="mb-1 mt-1 text-center text-2xl font-bold">누구 단어장을 볼까요?</h1>
           <p className="mb-6 text-center text-sm text-soft">부모 계정으로 자녀 화면을 미리 볼 수 있어요</p>
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {((children ?? []) as Profile[]).map((c) => (
+            {childProfiles.map((c) => (
               <Link key={c.id} href={`/check?childId=${c.id}`} className="profile-card">
-                <Avatar emoji={c.avatar} size="lg" />
+                <Avatar
+                  emoji={c.avatar}
+                  photoUrl={c.avatar_photo_path ? (photoUrls.get(c.avatar_photo_path) ?? null) : null}
+                  size="lg"
+                />
                 <span className="font-bold">{c.name}</span>
               </Link>
             ))}

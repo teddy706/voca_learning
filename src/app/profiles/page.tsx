@@ -3,6 +3,7 @@ import { requireParentProfile } from "@/lib/currentProfile";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { LogoutButton } from "@/components/LogoutButton";
+import { getAvatarPhotoUrls } from "@/lib/avatarPhoto";
 import type { Profile } from "@/lib/types";
 
 // Next.js 기본 fetch 캐시로 인한 Supabase 응답 재사용 방지(리딩버디 패턴 그대로).
@@ -20,6 +21,10 @@ export default async function ProfilesPage() {
     .order("created_at", { ascending: true });
 
   const childProfiles = (children ?? []) as Profile[];
+  const photoUrls = await getAvatarPhotoUrls(
+    supabase,
+    childProfiles.map((c) => c.avatar_photo_path)
+  );
 
   return (
     <div className="app-shell">
@@ -31,7 +36,11 @@ export default async function ProfilesPage() {
           {childProfiles.map((child) => (
             <div key={child.id} className="flex flex-col items-center gap-1.5">
               <Link href={`/profiles/${child.id}/pin`} className="profile-card mb-0">
-                <Avatar emoji={child.avatar} size="lg" />
+                <Avatar
+                  emoji={child.avatar}
+                  photoUrl={child.avatar_photo_path ? (photoUrls.get(child.avatar_photo_path) ?? null) : null}
+                  size="lg"
+                />
                 <span className="font-bold">{child.name}</span>
               </Link>
               {/* PIN 없이 부모 계정으로 자녀 화면을 미리 써보는 경로 — src/lib/vocabAuth.ts 권한 모델 */}

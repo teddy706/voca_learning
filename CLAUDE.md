@@ -105,11 +105,21 @@ OCR은 `src/lib/documentIntelligence.ts`의 `analyzeImage()` REST 폴링 패턴�
 ### 단어장 목록에 학습 이력 요약 (2026-09-14)
 `/check`(DAY 목록) 카드에 제목/단어 개수만 있던 걸, `vocabBatch.ts`의 `getBatchHistorySummaries(childId, batchIds)`로 배치별 ⭐(3개 시험 유형 별 총합)·✅(알아요)·🤔(몰라요) 개수를 한 줄로 덧붙였다(값이 0이면 그 아이콘은 아예 안 보임 — "간략하게" 요청 반영). 쿼리는 배치 수만큼 반복하지 않고 `vocab_batch_items`/`vocab_stars`를 배치 ID 목록으로 한 번에 가져와 애플리케이션에서 집계(N+1 방지).
 
+### 학습 진행 기록 초기화 (2026-09-14, 1회성 운영 작업)
+배포/테스트가 어느 정도 정리된 시점에 사용자가 4명 캐릭터(고아린/황유니/아빠/정보라) 전체의 진행 기록 초기화를 요청 — `vocab_attempts`(7건)/`vocab_word_marks`(23건) 삭제(`vocab_stars`는 원래 0건). **`vocab_words`/`vocab_batches`(등록된 단어장 자체)는 그대로 둠** — CSV 재가져오기 불필요. family_id로 스코프해서 REST API(service role)로 직접 삭제, 코드 변경은 없음(일회성 운영 작업이라 스크립트로 안 남김). 앞으로 또 초기화가 필요하면 같은 방식(3개 테이블을 family_id 또는 child_id로 delete)을 반복하면 된다.
+
 ### 앱 스캐폴딩 현황 (2026-09-14)
 Next.js 14.2.35(App Router) + TS + Tailwind로 초기화, `npm install`/`npm run build`/`npx tsc --noEmit` 전부 통과 확인. 만든 것:
 - **인프라**: `package.json`(리딩버디와 동일 핵심 의존성), `tsconfig.json`/`next.config.mjs`/`tailwind.config.ts`(자체 accent 컬러 `#4C6EF5`)/`postcss.config.mjs`/`.eslintrc.json`/`vitest.config.mts`/`vercel.json`(`regions: ["icn1"]`)/`.claude/launch.json`(dev 서버 프리뷰용)
 - **인증(리딩버디에서 그대로 복사, 4장 표 그대로)**: `src/lib/supabase/{client,server,admin}.ts`, `src/middleware.ts`, `src/lib/childAuth.ts`(diff 없음 확인), `src/lib/currentProfile.ts`, `src/app/api/auth/{login,logout}/route.ts`, `src/app/api/children/[id]/pin/route.ts`
-- **UI 컴포넌트(리딩버디 패턴 포팅, 사진 아바타 등 불필요한 부분은 단순화)**: `Avatar`(emoji만), `LogoutButton`, `PinKeypad`/`PinConfirmButton`/`PinDots`, `PinEntry`. `globals.css`의 `app-shell`/`card`/`input`/`btn*`/`profile-card` 컴포넌트 클래스도 색상만 바꿔 그대로 포팅(PRD 4.5 반응형/터치타겟 요건을 이미 만족하는 검증된 패턴)
+- **UI 컴포넌트(리딩버디 패턴 포팅)**: `Avatar`(emoji + 사진, 2026-09-14 사진 지원 추가 — 아래 참고), `LogoutButton`, `PinKeypad`/`PinConfirmButton`/`PinDots`, `PinEntry`. `globals.css`의 `app-shell`/`card`/`input`/`btn*`/`profile-card` 컴포넌트 클래스도 색상만 바꿔 그대로 포팅(PRD 4.5 반응형/터치타겟 요건을 이미 만족하는 검증된 패턴)
+
+### 자녀 아바타 사진 지원 (2026-09-14 추가)
+처음엔 `Avatar`를 emoji 전용으로 단순화했는데, 사용자가 "리딩버디에서 프로필을 가져왔는데 사진은 안 가져왔다"고 지적 — 실제로 고아린/황유니/아빠(자녀 역할) 프로필엔 리딩버디에서 올린 사진이 이미 있었고, 우리 쪽 화면 코드가 그걸 그냥 안 보여주고 있었을 뿐이었다(동기화 문제 아님 — `profiles` 테이블은 리딩버디와 완전히 같은 테이블이라 이름/PIN/이모지는 이미 실시간으로 반영되고 있었음).
+- `src/lib/avatarPhoto.ts`(리딩버디에서 그대로 포팅) — 비공개 `avatars` 스토리지 버킷에서 매번 서명된 URL(7일 TTL)을 발급. storage RLS는 리딩버디 `0007_avatar_photo.sql`이 이미 "같은 가족이면 누구나 조회 가능"으로 정의해둔 걸 그대로 재사용 — 이 앱에서 새로 안 만듦.
+- `Avatar.tsx`에 `photoUrl` prop 복원 — 있으면 사진, 없으면 emoji.
+- `/profiles`, `/profiles/[id]/pin`, `/home`, `/check`(부모 자녀 선택 화면)에서 `avatar_photo_path`를 조회해 `getAvatarPhotoUrl(s)`로 서명 URL을 받아 표시.
+- **이 앱에서 사진 업로드/교체 기능은 만들지 않음** — 조회만. 사진을 바꾸려면 리딩버디에서 업로드해야 함(그러면 여기도 자동 반영).
 - **페이지**: `/`(role별 리다이렉트) → `/login`(부모 로그인) → `/profiles`(자녀 선택) → `/profiles/[id]/pin`(PIN) → `/home`(자녀 홈, `vocab_words`/`vocab_batches` 개수를 실제로 조회해 보여줌 — DB 연결까지 검증됨)
 - **브라우저 확인**: `/login` 페이지 렌더링 확인(스타일 정상 적용). **부모 실제 로그인·PIN 입력은 비밀번호/PIN을 에이전트가 모르므로 테스트 못 함 — 사용자가 직접 `npm run dev` 후 `http://localhost:3000`에서 로그인→프로필 선택→PIN 입력→홈까지 확인 필요**
 - **PWA 아이콘 세트 완료 (2026-09-14)**: `public/manifest.json`의 `icons: []`를 채움 — accent색(#4C6EF5) 배경에 흰색 "ABC" 텍스트(Arial Bold, Pillow로 생성, `public/icons/*.png` + `public/favicon*`). `icon-192/512`(purpose: any) + `icon-maskable-192/512`(안전영역 30% 스케일) + `apple-touch-icon`(180) + `favicon.ico`. `layout.tsx`에 `appleWebApp`(capable/statusBarStyle/title) 메타와 `viewport.viewportFit: "cover"`, `globals.css`의 `.app-shell`에 `env(safe-area-inset-*)` 패딩도 추가(PRD 4.5 세이프 에어리어 요건). 브라우저로 manifest.json 응답·아이콘 로드·모바일 375px 뷰포트 렌더링까지 확인. **아직 안 한 것**: 실기기(아이폰 미니/아이패드 미니)에서 "홈 화면에 추가" 실제 테스트 — 시뮬레이터/브라우저 자동화로는 안 되고 사용자가 실기기로 확인해야 함.
