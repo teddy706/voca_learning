@@ -99,10 +99,16 @@ def day_title(filename):
     return f"능률보카 중등기본 DAY {day_num}"
 
 
-def batch_exists(base_url, service_key, child_id, title):
+def find_batch(base_url, service_key, child_id, title):
     path = f"vocab_batches?child_id=eq.{child_id}&title=eq.{urllib.parse.quote(title)}&select=id"
     existing = supabase_request(base_url, service_key, "GET", path)
     return existing[0]["id"] if existing else None
+
+
+def batch_item_count(base_url, service_key, batch_id):
+    path = f"vocab_batch_items?batch_id=eq.{batch_id}&select=word_id"
+    items = supabase_request(base_url, service_key, "GET", path)
+    return len(items)
 
 
 def import_day(base_url, service_key, csv_path, child):
@@ -112,10 +118,18 @@ def import_day(base_url, service_key, csv_path, child):
         print(f"  [{child['name']}] {title}: 빈 파일, 건너뜀")
         return
 
-    existing_id = batch_exists(base_url, service_key, child["id"], title)
-    if existing_id:
-        print(f"  [{child['name']}] {title}: 이미 등록됨(batch {existing_id}), 건너뜀")
-        return
+    # 재실행 안전성 체크는 배치 존재 여부만으로 부족하다 — vocab_batches를 만든 뒤
+    # vocab_batch_items POST가 중간에 실패하면(네트워크 오류, 예상 못한 중복 행 등) 그 배치는
+    # 이미 커밋된 채로 아이템이 0개인 상태로 남고, 다음 재실행은 "이미 있음"으로 착각해 영원히
+    # 건너뛰어 빈 DAY 카드가 남는다(코드 리뷰에서 발견). 배치가 있어도 아이템이 0개면 그 배치
+    # ID를 재사용해서 이어서 채운다.
+    batch_id = find_batch(base_url, service_key, child["id"], title)
+    if batch_id:
+        existing_count = batch_item_count(base_url, service_key, batch_id)
+        if existing_count > 0:
+            print(f"  [{child['name']}] {title}: 이미 등록됨(batch {batch_id}, 단어 {existing_count}개), 건너뜀")
+            return
+        print(f"  [{child['name']}] {title}: 배치는 있지만 단어가 0개(batch {batch_id}) — 이어서 채움")
 
     # 1) vocab_words upsert (child_id+korean+english 유니크 — 이미 있으면 merge, id는 기존 것 반환)
     word_payload = [
@@ -128,19 +142,20 @@ def import_day(base_url, service_key, csv_path, child):
     )
     word_id_by_pair = {(w["korean"], w["english"]): w["id"] for w in upserted}
 
-    # 2) vocab_batches 생성 (이 배치는 이미 검수된 데이터이므로 confirmed로 바로 생성)
-    batch = supabase_request(
-        base_url, service_key, "POST", "vocab_batches",
-        body=[{
-            "family_id": FAMILY_ID,
-            "child_id": child["id"],
-            "title": title,
-            "source_image_url": None,
-            "status": "confirmed",
-        }],
-        prefer="return=representation",
-    )
-    batch_id = batch[0]["id"]
+    # 2) vocab_batches 생성 (이미 있으면 재사용) — 이 배치는 이미 검수된 데이터이므로 confirmed로 바로 생성
+    if not batch_id:
+        batch = supabase_request(
+            base_url, service_key, "POST", "vocab_batches",
+            body=[{
+                "family_id": FAMILY_ID,
+                "child_id": child["id"],
+                "title": title,
+                "source_image_url": None,
+                "status": "confirmed",
+            }],
+            prefer="return=representation",
+        )
+        batch_id = batch[0]["id"]
 
     # 3) vocab_batch_items — CSV 원래 순서를 position으로 보존
     items = []

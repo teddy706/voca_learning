@@ -139,7 +139,9 @@ export function ChoiceSession({
         })}
       </div>
 
-      {feedback && (
+      {/* 정답일 땐 setTimeout(next, 600)이 자동으로 넘어가므로 수동 버튼을 안 보여준다 —
+          둘 다 있으면 타이밍에 따라 next()가 두 번 불려 문제 하나를 건너뛸 수 있다(코드 리뷰에서 발견). */}
+      {feedback?.status === "incorrect" && (
         <button type="button" onClick={next} className="btn btn-primary mt-4 mb-0">
           다음
         </button>

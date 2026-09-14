@@ -51,20 +51,30 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    const nextCount = profile.pin_fail_count + 1;
-    if (nextCount >= PIN_MAX_ATTEMPTS) {
-      await admin
-        .from("profiles")
-        .update({ pin_fail_count: 0, pin_locked_until: new Date(Date.now() + PIN_LOCK_DURATION_MS).toISOString() })
-        .eq("id", profile.id);
+    // 원자적 DB 함수(0007_atomic_counters.sql)로 증가 — "읽고 나서 +1해서 쓰기"를 애플리케이션
+    // 레벨에서 하면 동시 요청이 같은 값을 읽어 카운터가 절대 임계값에 안 닿는 레이스가 생긴다
+    // (코드 리뷰에서 발견, 리딩버디 원본 코드에도 같은 버그가 있을 가능성이 있음).
+    const { data: rpcResult, error: rpcError } = await admin.rpc("record_pin_failure", {
+      p_profile_id: profile.id,
+      p_max_attempts: PIN_MAX_ATTEMPTS,
+      p_lock_ms: PIN_LOCK_DURATION_MS,
+    });
+    if (rpcError) {
+      console.error("record_pin_failure RPC 실패:", rpcError);
+      return NextResponse.json({ error: "처리 중 문제가 생겼어요." }, { status: 500 });
+    }
+    const result = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult;
+    const nextCount: number = result.fail_count;
+    const lockedUntil: string | null = result.locked_until;
+
+    if (lockedUntil) {
       return NextResponse.json(
         { error: "너무 많이 틀렸어요. 1분 후 다시 시도해주세요.", lockedForSec: PIN_LOCK_DURATION_MS / 1000 },
         { status: 429 }
       );
     }
-    await admin.from("profiles").update({ pin_fail_count: nextCount }).eq("id", profile.id);
     return NextResponse.json(
-      { error: "PIN이 맞지 않아요.", attemptsLeft: PIN_MAX_ATTEMPTS - nextCount },
+      { error: "PIN이 맞지 않아요.", attemptsLeft: Math.max(0, PIN_MAX_ATTEMPTS - nextCount) },
       { status: 401 }
     );
   }

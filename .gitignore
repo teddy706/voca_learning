@@ -20,6 +20,10 @@
 *.tsbuildinfo
 next-env.d.ts
 
+# python (scripts/import_vocab_csv.py)
+__pycache__/
+*.pyc
+
 # supabase
 supabase/.temp
 .vercel

@@ -55,7 +55,7 @@ export interface VocabBatchItem {
 }
 
 export type VocabAttemptMode = "check" | "game";
-export type VocabAnswerMode = "typing" | "choice";
+export type VocabAnswerMode = "typing" | "choice" | "arrange";
 
 export interface VocabAttempt {
   id: string;

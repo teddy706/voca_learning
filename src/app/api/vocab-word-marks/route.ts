@@ -30,24 +30,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "단어를 찾을 수 없어요." }, { status: 404 });
   }
 
-  const { data: existing } = await supabase
-    .from("vocab_word_marks")
-    .select("id")
-    .eq("child_id", child.id)
-    .eq("word_id", wordId)
-    .maybeSingle();
-
-  const { error } = existing
-    ? await supabase
-        .from("vocab_word_marks")
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq("id", existing.id)
-    : await supabase.from("vocab_word_marks").insert({
-        family_id: child.family_id,
-        child_id: child.id,
-        word_id: wordId,
-        status,
-      });
+  // select-then-insert/update는 동시 요청(예: 같은 단어를 빠르게 두 번 탭)이 둘 다 "기존 행 없음"을
+  // 보고 동시에 insert를 시도해 유니크 제약(child_id, word_id) 위반 500을 낼 수 있었다(코드 리뷰에서
+  // 발견). status는 산술 연산이 필요 없는 단순 값 교체라 upsert 한 번으로 원자적으로 끝난다.
+  const { error } = await supabase.from("vocab_word_marks").upsert(
+    {
+      family_id: child.family_id,
+      child_id: child.id,
+      word_id: wordId,
+      status,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "child_id,word_id" }
+  );
 
   if (error) {
     console.error("vocab_word_marks 갱신 실패:", error);

@@ -8,6 +8,22 @@
 - 환경변수 9개(`.env.local`과 동일 키)는 **사용자가 Vercel 대시보드에서 직접 등록**(에이전트가 API 키/시크릿을 대신 입력하지 않음 — 리딩버디 관례 및 안전 정책). 등록 후 재배포해서 `/login` 페이지가 서버사이드 Supabase 체크(`/` → `/login` 리다이렉트)까지 정상 동작함을 실제 브라우저로 확인함.
 - 로컬 배포 CLI 명령: `vercel --prod --yes`(dev 서버와 별개로 언제든 실행 가능 — `.next`를 공유하는 `npm run build`와 달리 Vercel CLI는 원격에서 독립적으로 빌드하므로 로컬 dev 서버에 영향 없음).
 
+## `/code-review high` 결과 및 수정 (2026-09-14)
+전체 diff(Phase 0 스캐폴딩부터 이 시점까지)를 8개 관점(정확성 3·재사용/단순화/효율성 3·구조 깊이 1·CLAUDE.md 준수 1) 병렬 에이전트로 검증, 확정 10건 전부 수정 완료:
+1. **PIN 실패 카운터 레이스** — 동시 요청이 같은 값을 읽어 "5회 실패 시 잠금"이 무력화될 수 있었음. `record_pin_failure` DB 함수(단일 UPDATE로 원자적 증가)로 교체. `0007_atomic_counters.sql`.
+2. **별(⭐) 카운터 레이스** — 동시 만점 제출 시 하나가 유실될 수 있었음. `increment_vocab_star` DB 함수(INSERT...ON CONFLICT DO UPDATE, RLS는 SECURITY INVOKER로 그대로 유지)로 교체. 같은 마이그레이션.
+3. **알아요/몰라요 저장 레이스** — select 후 insert/update 방식이라 동시 요청 시 유니크 제약 위반 500이 날 수 있었음. `vocab_word_marks.upsert(...)` 한 번으로 교체(산술 연산이 없어 RPC 불필요).
+4. **4지선다 "다음" 버튼 레이스** — 정답 직후 자동 넘어가기(600ms) 전에 수동으로 눌러도 버튼이 떠 있어서, 둘 다 발동하면 문제 하나를 건너뛸 수 있었음. `feedback?.status === "incorrect"`일 때만 보이도록 수정(CheckSession/ArrangeSession과 동일하게).
+5. **글자 배열 "지우기" 버튼 레이스** — 같은 600ms 창에서 지우기를 누르면 "정답이에요!"가 뜬 채로 타일이 비워지는 시각적 결함. `feedback` 있을 때 비활성화.
+6. **pending_review 배치가 URL로 직접 접근 가능** — `/check` 목록은 confirmed만 보여주는데 `getOwnedBatchWithWords`는 status 필터가 없었음. `.eq("status","confirmed")` 추가(현재는 도달 불가 — OCR 경로가 보류 중이라 pending_review 배치가 아예 없음 — 하지만 그 경로가 돌아오면 바로 문제가 됨).
+7. **`/home`만 부모 미리보기가 안 되는 비일관성** — 다른 자녀 화면은 전부 `resolveActingChild`로 통일했는데 `/home`만 `requireChildProfile()`(본인 전용)로 남아있었음. `?childId=`를 받아 부모도 미리볼 수 있게 통일.
+8. **`getWordMarks`에 같은 `.in()` 위험 패턴이 남아있었음** — `getBatchHistorySummaries`에서 한 번 고친(876개 UUID URL 실패) 바로 그 패턴이 이 함수엔 그대로 있었음(코멘트로만 "많이 넘기지 말 것" 경고). `wordIds` 매개변수를 아예 없애고 `child_id` 하나로 전체 조회하도록 근본적으로 고침 — `getBatchHistorySummaries`도 이제 이 함수를 재사용(중복 제거 겸함).
+9. **`scripts/import_vocab_csv.py` 부분 실패 시 영구 빈 배치** — 배치 생성 후 아이템 삽입이 실패하면 재실행해도 "이미 있음"으로 착각해 영원히 빈 채로 남았음. 배치는 있는데 아이템이 0개면 그 배치 ID를 재사용해서 이어서 채우도록 수정.
+10. **`VocabAnswerMode` 타입에 `arrange` 누락** + **여러 곳에서 Supabase `error` 무시**(`currentProfile.ts`/`vocabAuth.ts`/`vocabBatch.ts`) — 타입에 `arrange` 추가, 3곳에 `console.error` 추가(이미 한 번 겪은 CLAUDE.md 함정과 같은 패턴이 다른 파일에 더 있었음).
+
+**DB 함수 배포 시 겪은 함정**: `0007_atomic_counters.sql`을 처음 실행했을 때 `record_pin_failure`는 만들어졌는데 `increment_vocab_star`는 PostgREST가 "함수를 찾을 수 없음"이라고 했다 — 캐시 지연이 아니라 파일 뒷부분이 실제로 안 만들어진 것으로 보임(원인 불명, 아마 붙여넣기 중 일부 누락). **전체 파일을 다시 통째로 실행하니 해결됨** — `create or replace function`은 재실행해도 안전하니, 여러 함수가 든 마이그레이션에서 일부만 안 만들어진 것 같으면 전체를 다시 실행해볼 것.
+`increment_vocab_star`는 일부러 `SECURITY DEFINER`가 아니라 기본값(INVOKER)로 만들었다 — DEFINER로 만들면 함수 안 INSERT/UPDATE가 RLS를 통째로 우회해서 "아무나 아무 자녀의 별을 조작 가능"이라는, 고치려던 레이스 버그보다 훨씬 심각한 구멍이 새로 생긴다. 이후 비슷한 "원자적 증가" 함수를 또 만들 때 이 원칙을 반드시 지킬 것 — service_role 전용 함수(`record_pin_failure`처럼)만 그 제약에서 자유롭다.
+
 ## 프로젝트 개요
 초등 3학년 쌍둥이 자녀(고아린, 황유니)의 학원 영단어 시험 대비 암기 점검 앱. 원래는 학원 단어장을
 사진으로 등록(OCR)하는 걸 목표로 했으나, 능률보카 중등기본(DAY 01~50) 단어를 이미 CSV로 정리해둔

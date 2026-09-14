@@ -33,31 +33,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "단어장을 찾을 수 없어요." }, { status: 404 });
   }
 
-  const { data: existing } = await supabase
-    .from("vocab_stars")
-    .select("id, star_count")
-    .eq("child_id", child.id)
-    .eq("batch_id", batchId)
-    .eq("mode", mode)
-    .maybeSingle();
-
-  const nextCount = (existing?.star_count ?? 0) + 1;
-
-  const { error } = existing
-    ? await supabase
-        .from("vocab_stars")
-        .update({ star_count: nextCount, updated_at: new Date().toISOString() })
-        .eq("id", existing.id)
-    : await supabase.from("vocab_stars").insert({
-        family_id: child.family_id,
-        child_id: child.id,
-        batch_id: batchId,
-        mode,
-        star_count: nextCount,
-      });
+  // "읽고 +1해서 쓰기"를 애플리케이션에서 하면 동시 제출(재시도, 두 탭 등) 시 하나가 유실될 수
+  // 있어(코드 리뷰에서 발견), 원자적 DB 함수(0007_atomic_counters.sql)로 증가시킨다.
+  const { data: nextCount, error } = await supabase.rpc("increment_vocab_star", {
+    p_family_id: child.family_id,
+    p_child_id: child.id,
+    p_batch_id: batchId,
+    p_mode: mode,
+  });
 
   if (error) {
-    console.error("vocab_stars 갱신 실패:", error);
+    console.error("increment_vocab_star RPC 실패:", error);
     return NextResponse.json({ error: "별 저장에 실패했어요." }, { status: 500 });
   }
 

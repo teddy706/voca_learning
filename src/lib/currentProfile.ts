@@ -21,7 +21,14 @@ export async function getCurrentProfile(): Promise<Profile | null> {
   } = await supabase.auth.getSession();
   if (!session?.user) return null;
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", session.user.id).maybeSingle();
+  // (2026-09-14 코드 리뷰에서 발견: 리딩버디 원본은 error를 확인하지 않아 DB 오류와 "로그인
+  // 안 됨"이 구분 안 됐다 — 로그를 남기되 반환 동작 자체는 리딩버디와 동일하게 유지한다.)
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("user_id", session.user.id)
+    .maybeSingle();
+  if (error) console.error("getCurrentProfile 조회 실패:", error);
 
   return profile;
 }

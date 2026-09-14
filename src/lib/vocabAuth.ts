@@ -25,13 +25,14 @@ export async function resolveActingChild(childId: string): Promise<ActingContext
   }
 
   const supabase = createClient();
-  const { data: child } = await supabase
+  const { data: child, error } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", childId)
     .eq("family_id", requester.family_id)
     .eq("role", "child")
     .maybeSingle();
+  if (error) console.error("resolveActingChild 조회 실패:", error);
   if (!child) return null;
 
   return { requester, child: child as Profile };

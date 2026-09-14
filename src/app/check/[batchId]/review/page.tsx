@@ -15,10 +15,7 @@ export default async function ReviewPage({
   const result = await getOwnedBatchWithWords(params.batchId);
   if (!result) notFound();
 
-  const marks = await getWordMarks(
-    result.child.id,
-    result.words.map((w) => w.id)
-  );
+  const marks = await getWordMarks(result.child.id);
   let words: ReviewWord[] = result.words.map((w) => ({ ...w, mark: marks.get(w.id) ?? null }));
 
   // 모드 허브의 "헷갈리는 단어만 다시 복습" 카드에서 넘어온 경우 — 복습을 끝까지 안 해도

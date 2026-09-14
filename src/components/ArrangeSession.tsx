@@ -80,6 +80,9 @@ export function ArrangeSession({
   }
 
   function resetSlots() {
+    // placeTile/clearSlot과 같은 가드 — 없으면 정답 직후 자동 넘어가기 전 600ms 동안 "지우기"를
+    // 눌러서 "정답이에요!"가 떠 있는 채로 타일이 비워지는 게 보인다(코드 리뷰에서 발견).
+    if (feedback) return;
     setPlacement(new Array(slotCount).fill(null));
     setTileUsed(new Array(slotCount).fill(false));
   }
@@ -223,7 +226,12 @@ export function ArrangeSession({
         </button>
       ) : (
         <div className="flex gap-2">
-          <button type="button" onClick={resetSlots} disabled={submitting} className="btn btn-outline mb-0 flex-1">
+          <button
+            type="button"
+            onClick={resetSlots}
+            disabled={submitting || feedback !== null}
+            className="btn btn-outline mb-0 flex-1"
+          >
             지우기
           </button>
           <button

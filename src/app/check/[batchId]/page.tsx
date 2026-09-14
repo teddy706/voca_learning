@@ -28,10 +28,7 @@ export default async function CheckModeHubPage({ params }: { params: { batchId: 
     .eq("batch_id", batch.id);
   const starByMode = new Map((stars ?? []).map((s) => [s.mode, s.star_count]));
 
-  const marks = await getWordMarks(
-    child.id,
-    words.map((w) => w.id)
-  );
+  const marks = await getWordMarks(child.id);
   const unknownWords = words.filter((w) => marks.get(w.id) === "unknown");
 
   return (
