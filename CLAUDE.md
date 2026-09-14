@@ -61,7 +61,7 @@ OCR은 `src/lib/documentIntelligence.ts`의 `analyzeImage()` REST 폴링 패턴�
 - [x] 2. 점검 모드 — 타이핑 응답 — **사용자 확인 완료(2026-09-14)**, 아래 "점검 모드 전면 재설계" 참고
 - [x] 3. 점검 모드 — 보기 선택 응답(4지선다) — 완료, 디스트랙터 로직은 PRD 4.3.1 그대로 구현
 - [x] 4. 자녀 PIN 프로필 로그인 연동(리딩버디 계정 그대로 재사용) — **사용자가 실제 계정으로 로그인→프로필 선택→PIN→홈 화면(단어 개수 표시)까지 확인 완료(2026-09-14)**
-- [ ] 5. 공통 `SpeakButton`(Web Speech API 발음 재생) 컴포넌트 + 점검 화면 적용
+- [~] 5. 발음 재생(Web Speech API) — 복습 모드에 적용 완료(아래 참고), **시험 도전(타이핑/4지선다/글자배열) 화면에는 아직 미적용** — 필요하면 요청할 것
 - [~] 6. 아이폰 미니/아이패드 미니 실기기에서 반응형 레이아웃·PWA 설치 확인(카메라 테스트는 제외 — 사진 등록 없음) — PWA 아이콘/메타 태그/세이프 에어리어는 완료(위 참고), **실기기 "홈 화면에 추가" 테스트는 아직 사용자 확인 필요**
 - [x] 7. (추가 항목) 복습(암기) 모드 + 글자 배열 시험 유형 + 별 보상 — 2026-09-14 사용자 요청으로 범위 추가, 아래 참고
 - [x] 8. (추가 항목) 부모 계정으로 자녀 화면 미리보기(PIN 없이) — 2026-09-14 사용자 요청
@@ -120,6 +120,12 @@ Next.js 14.2.35(App Router) + TS + Tailwind로 초기화, `npm install`/`npm run
 - `Avatar.tsx`에 `photoUrl` prop 복원 — 있으면 사진, 없으면 emoji.
 - `/profiles`, `/profiles/[id]/pin`, `/home`, `/check`(부모 자녀 선택 화면)에서 `avatar_photo_path`를 조회해 `getAvatarPhotoUrl(s)`로 서명 URL을 받아 표시.
 - **이 앱에서 사진 업로드/교체 기능은 만들지 않음** — 조회만. 사진을 바꾸려면 리딩버디에서 업로드해야 함(그러면 여기도 자동 반영).
+
+### 복습 모드 발음 재생 (2026-09-14 추가)
+사용자가 "탭해서 영어로 넘어가면 발음이 나면 좋겠다"고 요청 — Web Speech API라 서버/비용 없이 몇 줄로 끝남(PRD 4.6에서 이미 계획했던 것).
+- `src/lib/speech.ts`의 `speakEnglish(text)` — `window.speechSynthesis`로 `en-US` 발음. 이전 발음이 겹치지 않게 매번 `cancel()` 먼저 호출.
+- `ReviewSession.tsx`의 카드 탭 핸들러(`toggleFlip`)에서 한글→영어로 뒤집히는 순간에만 호출 — **반드시 클릭 핸들러 안에서 동기적으로 직접 호출**(setState 콜백이나 이후로 미루지 않음), iOS Safari가 사용자 제스처 없이는 재생을 막기 때문.
+- 시험 도전(타이핑/4지선다/글자배열) 쪽엔 아직 적용 안 함 — 필요하면 같은 `speakEnglish` 함수를 재사용하면 됨.
 - **페이지**: `/`(role별 리다이렉트) → `/login`(부모 로그인) → `/profiles`(자녀 선택) → `/profiles/[id]/pin`(PIN) → `/home`(자녀 홈, `vocab_words`/`vocab_batches` 개수를 실제로 조회해 보여줌 — DB 연결까지 검증됨)
 - **브라우저 확인**: `/login` 페이지 렌더링 확인(스타일 정상 적용). **부모 실제 로그인·PIN 입력은 비밀번호/PIN을 에이전트가 모르므로 테스트 못 함 — 사용자가 직접 `npm run dev` 후 `http://localhost:3000`에서 로그인→프로필 선택→PIN 입력→홈까지 확인 필요**
 - **PWA 아이콘 세트 완료 (2026-09-14)**: `public/manifest.json`의 `icons: []`를 채움 — accent색(#4C6EF5) 배경에 흰색 "ABC" 텍스트(Arial Bold, Pillow로 생성, `public/icons/*.png` + `public/favicon*`). `icon-192/512`(purpose: any) + `icon-maskable-192/512`(안전영역 30% 스케일) + `apple-touch-icon`(180) + `favicon.ico`. `layout.tsx`에 `appleWebApp`(capable/statusBarStyle/title) 메타와 `viewport.viewportFit: "cover"`, `globals.css`의 `.app-shell`에 `env(safe-area-inset-*)` 패딩도 추가(PRD 4.5 세이프 에어리어 요건). 브라우저로 manifest.json 응답·아이콘 로드·모바일 375px 뷰포트 렌더링까지 확인. **아직 안 한 것**: 실기기(아이폰 미니/아이패드 미니)에서 "홈 화면에 추가" 실제 테스트 — 시뮬레이터/브라우저 자동화로는 안 되고 사용자가 실기기로 확인해야 함.

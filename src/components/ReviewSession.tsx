@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { speakEnglish } from "@/lib/speech";
 
 export interface ReviewWord {
   id: string;
@@ -49,6 +50,14 @@ export function ReviewSession({
       setSaving(false);
       next();
     }
+  }
+
+  // 탭해서 영어로 뒤집힐 때 발음을 읽어준다(사용자 요청) — 반드시 이 클릭 핸들러 안에서
+  // 직접 동기적으로 호출해야 iOS Safari가 재생을 허용한다(speech.ts 참고).
+  function toggleFlip() {
+    const willShowEnglish = !flipped;
+    setFlipped(willShowEnglish);
+    if (willShowEnglish) speakEnglish(current.english);
   }
 
   function next() {
@@ -111,7 +120,7 @@ export function ReviewSession({
 
       <button
         type="button"
-        onClick={() => setFlipped((f) => !f)}
+        onClick={toggleFlip}
         className="card relative mb-4 flex min-h-40 w-full flex-col items-center justify-center gap-2 text-center transition-transform active:scale-[0.98]"
       >
         {currentMark === "known" && (
