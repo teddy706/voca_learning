@@ -129,3 +129,116 @@ export async function getBatchHistorySummaries(
 
   return summaries;
 }
+
+export interface ChildDashboardStats {
+  wordCount: number;
+  batchCount: number;
+  totalAttempts: number;
+  correctAttempts: number;
+  totalStars: number;
+  knownCount: number;
+  unknownCount: number;
+  lastActivityAt: string | null;
+}
+
+/**
+ * 부모 대시보드용 자녀 1명 요약 통계. 한 가족의 자녀는 최대 4명 정도라, 자녀별로 이 함수를
+ * Promise.all로 병렬 호출하는 건 getWordMarks/getBatchHistorySummaries가 경계하는 "ID 목록을
+ * .in()에 수백 개 나열"과는 다른 문제(자녀 수 자체가 작음) — 여기서는 그냥 자녀당 소수의
+ * count 쿼리로 충분하다.
+ */
+export async function getChildDashboardStats(childId: string): Promise<ChildDashboardStats> {
+  const supabase = createClient();
+
+  const [wordCountRes, batchCountRes, totalAttemptsRes, correctAttemptsRes, lastAttemptRes, starsRes, marks] =
+    await Promise.all([
+      supabase.from("vocab_words").select("id", { count: "exact", head: true }).eq("child_id", childId),
+      supabase
+        .from("vocab_batches")
+        .select("id", { count: "exact", head: true })
+        .eq("child_id", childId)
+        .eq("status", "confirmed"),
+      supabase.from("vocab_attempts").select("id", { count: "exact", head: true }).eq("child_id", childId),
+      supabase
+        .from("vocab_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("child_id", childId)
+        .eq("is_correct", true),
+      supabase
+        .from("vocab_attempts")
+        .select("attempted_at")
+        .eq("child_id", childId)
+        .order("attempted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase.from("vocab_stars").select("star_count").eq("child_id", childId),
+      getWordMarks(childId),
+    ]);
+
+  if (wordCountRes.error) console.error("getChildDashboardStats wordCount 조회 실패:", wordCountRes.error);
+  if (batchCountRes.error) console.error("getChildDashboardStats batchCount 조회 실패:", batchCountRes.error);
+  if (totalAttemptsRes.error) console.error("getChildDashboardStats totalAttempts 조회 실패:", totalAttemptsRes.error);
+  if (correctAttemptsRes.error)
+    console.error("getChildDashboardStats correctAttempts 조회 실패:", correctAttemptsRes.error);
+  if (lastAttemptRes.error) console.error("getChildDashboardStats lastAttempt 조회 실패:", lastAttemptRes.error);
+  if (starsRes.error) console.error("getChildDashboardStats stars 조회 실패:", starsRes.error);
+
+  let knownCount = 0;
+  let unknownCount = 0;
+  for (const status of Array.from(marks.values())) {
+    if (status === "known") knownCount += 1;
+    else unknownCount += 1;
+  }
+
+  return {
+    wordCount: wordCountRes.count ?? 0,
+    batchCount: batchCountRes.count ?? 0,
+    totalAttempts: totalAttemptsRes.count ?? 0,
+    correctAttempts: correctAttemptsRes.count ?? 0,
+    totalStars: (starsRes.data ?? []).reduce((sum, s) => sum + s.star_count, 0),
+    knownCount,
+    unknownCount,
+    lastActivityAt: lastAttemptRes.data?.attempted_at ?? null,
+  };
+}
+
+export interface RecentAttempt {
+  id: string;
+  korean: string;
+  english: string;
+  userInput: string;
+  isCorrect: boolean;
+  mode: string;
+  answerMode: string;
+  attemptedAt: string;
+}
+
+/** 부모 대시보드의 "최근 학습 기록" — 이 자녀의 가장 최근 시도 N개를 단어 텍스트와 함께. */
+export async function getRecentAttempts(childId: string, limit = 15): Promise<RecentAttempt[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("vocab_attempts")
+    .select("id, user_input, is_correct, mode, answer_mode, attempted_at, word:vocab_words(korean, english)")
+    .eq("child_id", childId)
+    .order("attempted_at", { ascending: false })
+    .limit(limit);
+  if (error) console.error("getRecentAttempts 조회 실패:", error);
+
+  return (data ?? [])
+    .map((a) => {
+      // getOwnedBatchWithWords와 동일한 이유로 1:1 관계가 배열로 추론됨 — unknown 경유 캐스팅.
+      const word = a.word as unknown as { korean: string; english: string } | null;
+      if (!word) return null;
+      return {
+        id: a.id,
+        korean: word.korean,
+        english: word.english,
+        userInput: a.user_input,
+        isCorrect: a.is_correct,
+        mode: a.mode,
+        answerMode: a.answer_mode,
+        attemptedAt: a.attempted_at,
+      };
+    })
+    .filter((a): a is RecentAttempt => a !== null);
+}

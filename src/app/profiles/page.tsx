@@ -57,6 +57,12 @@ export default async function ProfilesPage() {
           </p>
         )}
 
+        {childProfiles.length > 0 && (
+          <Link href="/dashboard" className="btn btn-outline mb-0">
+            📊 학습 현황 보기
+          </Link>
+        )}
+
         <div className="mt-auto flex flex-col gap-2 md:mx-auto md:w-full md:max-w-xs">
           <LogoutButton />
         </div>
