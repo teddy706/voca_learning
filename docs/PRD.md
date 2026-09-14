@@ -300,9 +300,9 @@ create index vocab_attempts_family_id_idx on vocab_attempts(family_id);
   - 리딩버디 CLAUDE.md/인증 코드 먼저 읽고 재사용 가능한 부분 목록화
   - 이 저장소에 `docs/{PRD,BRIEF,STORIES,ARCHITECTURE}.md` 4종 스캐폴드 생성 (이 문서를 PRD.md로 이동) — **완료 (2026-09-14)**
   - ~~Supabase 조직 무료 슬롯 확인~~ → **완료: 2/2 슬롯 모두 사용 중(reading-buddy, twin-choice) 확인됨(4.1.1), 리딩버디 프로젝트 공유로 결정**
-  - 리딩버디 Supabase 프로젝트에 `vocab_*` 마이그레이션 추가 — 기존 테이블에 영향 없는지 확인 후 SQL Editor에서 실행
-  - Azure Blob Storage 계정/컨테이너 생성(비공개, Document Intelligence와 같은 리전)
-  - 학원 단어장 사진 1~2장으로 Document Intelligence 모델 선택 테스트
+  - ~~리딩버디 Supabase 프로젝트에 `vocab_*` 마이그레이션 추가~~ → **완료(2026-09-14)**: `supabase/migrations/0001_vocab_schema.sql`, `0002_vocab_rls.sql`을 사용자가 SQL Editor에서 직접 실행, 에러 없이 성공. `0003_vocab_grants.sql`(안전장치)은 미실행 — 앱 코드에서 permission denied가 나면 그때 실행
+  - ~~Azure Blob Storage 계정/컨테이너 생성(비공개, Document Intelligence와 같은 리전)~~ → **완료(2026-09-14)**: 계정 `vocakokphotos`, 컨테이너 `vocab-photos`(비공개), `RG-reading-buddy`/Korea Central(Document Intelligence와 동일 리전), Standard_LRS/Hot. Azure CLI로 생성(`az login` 계정: `teddy706@m14v.microsoft.com`, 구독 "Visual Studio Enterprise 구독")
+  - 학원 단어장 사진 1~2장으로 Document Intelligence 모델 선택 테스트 — 아직 미착수(실제 단어장 사진 필요)
   - **(선택, 순서 무관) 기존 mp3 단어장 일괄 가져오기 — 4.7, `MP3_stt` 작업 디렉터리에서 진행 중.** 이 작업은 스키마만 준비되면 앱 개발 진행 상황과 무관하게 아무 때나 돌릴 수 있다.
 - **Phase 1** — 등록 & 점검 (MVP)
   - [ ] 1. 리딩버디 프로젝트에 Supabase 스키마 추가 (`vocab_words/batches/batch_items/attempts`)
@@ -327,13 +327,13 @@ create index vocab_attempts_family_id_idx on vocab_attempts(family_id);
 
 ## 6. 인프라 함정 체크리스트 (가이드 3장 반영 — 착수 전 미리 알아둘 것)
 
-- [ ] Azure Document Intelligence가 배포하려는 리전에서 제공되는지 확인(오디오 모델처럼 리전 제약이 있을 수 있음). Blob Storage 계정도 같은 리전으로 만들어야 Blob URL 직접 참조 시 지연이 없음.
-- [ ] 같은 Azure 구독의 다른 리소스(리딩버디)와 TPM/쿼터를 공유하는지 확인 — 같은 리전에서 기본 용량 배포 실패 가능.
-- [ ] Azure OCR/Blob 키는 생성 즉시 Vercel에 넣기 전(후)에 별도 안전한 곳에 백업 — Vercel "Sensitive" 변수는 소유자도 재조회 불가.
-- [ ] **`vocab_*` 마이그레이션은 리딩버디와 같은 Supabase 프로젝트에 적용되므로, SQL Editor 실행 전 리딩버디 기존 테이블에 영향 없는지 반드시 재확인**(이름 충돌, 외래키 연결 대상 등).
-- [ ] Blob 컨테이너를 비공개(Private)로 생성하고, 클라이언트에는 서버가 발급한 SAS 토큰으로만 접근하게 되는지 Phase 1 초반에 검증(4.1.1 접근 제어 참고).
+- [x] Azure Document Intelligence가 배포하려는 리전에서 제공되는지 확인 → 리딩버디가 이미 Korea Central에서 운영 중이므로 문제없음. Blob Storage 계정(`vocakokphotos`)도 같은 Korea Central로 생성 완료(2026-09-14).
+- [ ] 같은 Azure 구독의 다른 리소스(리딩버디)와 TPM/쿼터를 공유하는지 확인 — 같은 리전에서 기본 용량 배포 실패 가능. (Document Intelligence는 리딩버디 리소스를 그대로 재사용하기로 해서 새 배포가 없으므로 이 프로젝트에서는 해당 없음이 될 가능성 높음 — 별도 리소스로 바꾸게 되면 재확인)
+- [ ] Azure OCR/Blob 키는 생성 즉시 Vercel에 넣기 전(후)에 별도 안전한 곳에 백업 — Vercel "Sensitive" 변수는 소유자도 재조회 불가. (현재는 로컬 `.env.local`에만 있음, Vercel 배포 단계에서 재확인)
+- [x] **`vocab_*` 마이그레이션은 리딩버디와 같은 Supabase 프로젝트에 적용되므로, SQL Editor 실행 전 리딩버디 기존 테이블에 영향 없는지 반드시 재확인**(이름 충돌, 외래키 연결 대상 등) → 확인 후 0001/0002 실행 완료, 에러 없음(2026-09-14).
+- [x] Blob 컨테이너를 비공개(Private)로 생성 → 완료(`public access off`). 클라이언트에는 서버가 발급한 SAS 토큰으로만 접근하게 하는 API는 아직 미구현(Phase 1 코드 작성 2번 항목).
 - [ ] 앱을 일주일 이상 안 쓰면 무료 Supabase 프로젝트가 자동 일시정지된다는 점을 인지(리딩버디와 같이 쓰므로 이미 알려진 리스크) — 필요 시 수동 재개.
-- [ ] Vercel 함수 리전과 Supabase 리전 일치 확인(리딩버디와 이미 맞춰져 있으면 자동 상속).
+- [ ] Vercel 함수 리전과 Supabase 리전 일치 확인(리딩버디와 이미 맞춰져 있으면 자동 상속) — 이 앱을 Vercel에 배포하는 시점에 확인.
 
 ---
 

@@ -113,7 +113,8 @@ voca_learning/
 - 환경변수명은 리딩버디와 동일하게: `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT`, `AZURE_DOCUMENT_INTELLIGENCE_KEY`.
 
 ### 7.2 Azure Blob Storage
-- 비공개 컨테이너, 서버가 SAS 토큰 발급. Document Intelligence와 같은 리전 권장.
+- **생성 완료(2026-09-14)**: 계정 `vocakokphotos`, 컨테이너 `vocab-photos`(비공개, `--public-access off`), `RG-reading-buddy`/Korea Central(Document Intelligence와 동일 리전), `Standard_LRS`/Hot 티어. Azure CLI(`az storage account create`/`az storage container create`)로 생성, 계정 키는 `.env.local`의 `AZURE_STORAGE_ACCOUNT_NAME`/`AZURE_STORAGE_ACCOUNT_KEY`/`AZURE_STORAGE_CONTAINER_NAME`.
+- 서버가 SAS 토큰을 발급하는 API는 아직 미구현(Phase 1 진행 순서 2번) — 계정 키로 직접 SAS를 만드는 `@azure/storage-blob`의 `generateBlobSASQueryParameters` 사용 예정.
 
 ### 7.3 발음 재생
 - Phase 1: Web Speech API (클라이언트 전용, 서버 호출 없음).

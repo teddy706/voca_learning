@@ -28,8 +28,8 @@
 - [x] 리딩버디 CLAUDE.md/인증 코드를 먼저 읽고 재사용 가능한 부분 목록화 (2026-09-14) — 결과는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 4장·6장, 요약은 바로 아래 섹션
 - [x] `supabase/migrations/0001_vocab_schema.sql`~`0003_vocab_grants.sql` 작성 완료 (2026-09-14). **0001/0002는 사용자가 리딩버디 Supabase SQL Editor에서 실행 완료(2026-09-14, 에러 없음)** — `vocab_words`/`vocab_batches`/`vocab_batch_items`/`vocab_attempts` 테이블 + RLS 정책 적용됨. `0003_vocab_grants.sql`은 아직 미실행 — 앱 코드에서 실제 쿼리 시 `permission denied`가 나면 그때 실행(Phase 1 코드 작성 단계에서 확인)
 - [x] 리딩버디 `.env.local`에서 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` / `CHILD_AUTH_SECRET`을 그대로 복사해 `.env.local` 생성 완료 (2026-09-14). `AZURE_DOCUMENT_INTELLIGENCE_*`도 리딩버디 리소스를 우선 재사용하도록 반영. `AZURE_STORAGE_*`(Blob)는 아직 빈 값 — 컨테이너 생성 후 채울 것
-- [ ] Azure Blob Storage 컨테이너(비공개) 생성 + SAS 토큰 발급 API
-- [ ] 학원 단어장 사진 1~2장으로 Document Intelligence 모델(`prebuilt-layout` vs `prebuilt-read`) 선택 테스트 — 리딩버디 `reading-buddy-docintel` 리소스 재사용 여부도 이때 결정
+- [x] Azure Blob Storage 계정/컨테이너 생성 완료 (2026-09-14) — 계정 `vocakokphotos`, 컨테이너 `vocab-photos`(비공개, public access off), `RG-reading-buddy`/Korea Central, Standard_LRS/Hot. 값은 `.env.local`에 반영됨. **SAS 토큰 발급 API는 아직 미구현**(Phase 1 코드 작성 단계, 2번 항목)
+- [ ] 학원 단어장 사진 1~2장으로 Document Intelligence 모델(`prebuilt-layout` vs `prebuilt-read`) 선택 테스트 — 리딩버디 `reading-buddy-docintel` 리소스 재사용 결정됨(위 .env.local), 실제 사진으로 정확도 테스트는 아직
 
 ### 리딩버디에서 확인한 재사용 자산 (2026-09-14 코드 확인 완료)
 아래 파일은 **재작성하지 않고 그대로 복사**해 온다 (자세한 표는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 4장):

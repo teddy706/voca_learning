@@ -58,10 +58,12 @@
 | 단어 등록 권한 | 부모 + 자녀(PIN) 모두 가능 |
 
 ## 8. 현재 상태 (2026-09-14)
-- **Phase 0 진행 중.** 코드는 아직 없음 — 이번 세션에서 `docs/` 4종 문서와 루트 `CLAUDE.md`만 스캐폴딩.
+- **Phase 0 거의 완료, 코드 작성(Phase 1) 시작 전.** `docs/` 4종 문서와 루트 `CLAUDE.md` 스캐폴딩 완료.
 - Supabase 무료 슬롯 확인 완료(2/2 소진 → 리딩버디 프로젝트 공유로 확정, [PRD.md](PRD.md) 4.1.1).
+- `vocab_words`/`vocab_batches`/`vocab_batch_items`/`vocab_attempts` 스키마 + RLS 마이그레이션을 리딩버디 Supabase 프로젝트에 적용 완료(에러 없음).
+- Azure Blob Storage 계정(`vocakokphotos`)/컨테이너(`vocab-photos`, 비공개) 생성 완료, Document Intelligence는 리딩버디 기존 리소스 재사용 결정. `.env.local` 구성 완료.
+- 남은 Phase 0 항목: 실제 단어장 사진으로 Document Intelligence 모델(`prebuilt-layout` vs `prebuilt-read`) 선택 테스트.
 - 별도 작업 디렉터리 `MP3_stt`에서 기존 mp3 단어장(능률보카 중등기본 DAY 01~50) 일괄 가져오기 실험이 선행 진행 중 — DAY_01~06 샘플 검증 + PDF 정답지 대조까지 완료 ([PRD.md](PRD.md) 4.7).
-- Azure Blob 컨테이너, Document Intelligence 리소스, `vocab_*` 마이그레이션은 아직 미착수.
 
 ## 9. 주요 리스크
 - **비결정성**: 동일 오디오/이미지를 여러 번 처리해도 결과가 달라질 수 있음(4.7에서 실측 확인) — OCR 파이프라인에서도 유사 문제가 재발할 가능성을 염두에 두고, 확인 화면 UX를 정확도보다 우선시한다.
