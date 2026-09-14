@@ -27,7 +27,7 @@
 ## 6. 범위
 
 ### 포함 (Phase 1)
-- 사진 업로드 → Azure Document Intelligence OCR → 확인/수정 UI → 배치 등록
+- ~~사진 업로드 → Azure Document Intelligence OCR → 확인/수정 UI → 배치 등록~~ → **CSV 일괄 가져오기로 대체 완료**(2026-09-14, 아래 "제외" 참고)
 - 점검 모드: 타이핑 응답 / 유사 스펠링 4지선다 응답 (세션 시작 시 선택)
 - 문항·정답별 발음 재생 (Web Speech API)
 - 부모 + 자녀(PIN) 모두 등록 가능, RLS로 자녀 간 데이터 격리
@@ -36,6 +36,9 @@
 ### 포함 (Phase 2)
 - 단어은행 전체 대상 가중 랜덤 게임 (최근/빈도 기반 오답 가중치)
 - 오답노트, 누적 정답률/스트릭 표시
+
+### 제외 (이번 Phase 보류, 2026-09-14 결정)
+- **사진 촬영 → OCR 등록**: 능률보카 중등기본 DAY 01~50 CSV로 등록을 대신하기로 해서 이번 Phase엔 불필요. 학원이 다른 책으로 바뀌거나 사진으로만 얻는 단어장이 생기면 재검토 — Blob/Document Intelligence 인프라는 이미 만들어둠.
 
 ### 제외 (의도적 보류, Phase 3 후보)
 - 쌍둥이 간 랭킹/비교
@@ -58,12 +61,12 @@
 | 단어 등록 권한 | 부모 + 자녀(PIN) 모두 가능 |
 
 ## 8. 현재 상태 (2026-09-14)
-- **Phase 0 거의 완료, 코드 작성(Phase 1) 시작 전.** `docs/` 4종 문서와 루트 `CLAUDE.md` 스캐폴딩 완료.
+- **Phase 0 완료, Phase 1(점검 기능 코드 작성) 진행 중.** `docs/` 4종 문서와 루트 `CLAUDE.md` 스캐폴딩 완료.
 - Supabase 무료 슬롯 확인 완료(2/2 소진 → 리딩버디 프로젝트 공유로 확정, [PRD.md](PRD.md) 4.1.1).
 - `vocab_words`/`vocab_batches`/`vocab_batch_items`/`vocab_attempts` 스키마 + RLS 마이그레이션을 리딩버디 Supabase 프로젝트에 적용 완료(에러 없음).
-- Azure Blob Storage 계정(`vocakokphotos`)/컨테이너(`vocab-photos`, 비공개) 생성 완료, Document Intelligence는 리딩버디 기존 리소스 재사용 결정. `.env.local` 구성 완료.
-- 남은 Phase 0 항목: 실제 단어장 사진으로 Document Intelligence 모델(`prebuilt-layout` vs `prebuilt-read`) 선택 테스트.
-- 별도 작업 디렉터리 `MP3_stt`에서 기존 mp3 단어장(능률보카 중등기본 DAY 01~50) 일괄 가져오기 실험이 선행 진행 중 — DAY_01~06 샘플 검증 + PDF 정답지 대조까지 완료 ([PRD.md](PRD.md) 4.7).
+- Azure Blob Storage 계정(`vocakokphotos`)/컨테이너(`vocab-photos`, 비공개) 생성 완료, Document Intelligence는 리딩버디 기존 리소스 재사용 결정. `.env.local` 구성 완료. **단, 사진 OCR 등록 자체는 이번 Phase에서 제외하기로 해서 이 인프라는 당장 쓰지 않는다.**
+- **단어 등록 완료**: 학원 시험 범위가 능률보카 중등기본과 같아서, 오디오 STT+PDF 정답지로 만든 CSV(`MP3_stt/voca_mp3/*_review.csv`, DAY 01~50)를 `scripts/import_vocab_csv.py`로 실제 쌍둥이 자녀(고아린, 황유니) 둘 다에게 일괄 등록 완료 — 자녀당 고유 단어 876개, 배치 100개.
+- 남은 Phase 1 항목: 점검 모드(타이핑/4지선다), 자녀 PIN 로그인 연동, 발음 재생, 반응형 확인.
 
 ## 9. 주요 리스크
 - **비결정성**: 동일 오디오/이미지를 여러 번 처리해도 결과가 달라질 수 있음(4.7에서 실측 확인) — OCR 파이프라인에서도 유사 문제가 재발할 가능성을 염두에 두고, 확인 화면 UX를 정확도보다 우선시한다.

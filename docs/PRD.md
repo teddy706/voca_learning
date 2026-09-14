@@ -31,6 +31,7 @@
 | 단어 등록 권한 | **부모 + 자녀(PIN 프로필) 모두 등록 가능** | 사용자 확인 완료 — 4.1 RLS 설계에 반영 |
 | 발음 재생 | **Web Speech API(브라우저 내장 TTS)** 우선 사용 | 무료·별도 백엔드 불필요·iOS Safari 지원. 음질 부족 시 Azure TTS로 업그레이드(4.6 참고) |
 | 응답 방식 | **타이핑 입력 / 유사 스펠링 객관식 선택** 두 가지 모두 지원, 세션 시작 시 선택 | 사용자 확인 완료 — 점검·게임 모드 공통(4.3.1 참고) |
+| 단어 등록 경로 (2026-09-14 변경) | **사진 촬영 → OCR 등록은 이번 Phase에서 제외.** 능률보카 중등기본 DAY 01~50 단어를 이미 CSV로 정리해뒀으므로, `scripts/import_vocab_csv.py`로 일괄 가져오기가 이번 Phase의 등록 경로다 | 사용자 확인 완료 — 학원 단어장이 우연히 시판 교재(능률보카)와 같아서 오디오+정답지로 이미 확보한 데이터가 있음. 사진 등록은 이 데이터가 안 통하는 새 단어장이 생길 때 재검토(4.2/4.8 참고) |
 
 > **재검토 중이 아닌 이상 위 표는 그대로 믿고 진행.** 특히 "리딩버디와 Supabase 프로젝트 공유"는 실무상 가장 영향이 큰 결정이라(2026-09-14, 무료 슬롯 소진 확인 후 최종 확정) 4.1에서 별도로 다시 짚는다.
 
@@ -287,10 +288,19 @@ create index vocab_attempts_family_id_idx on vocab_attempts(family_id);
 1. mp3 폴더 → `import_vocab_audio.py`(구 `transcribe_vocab.py`) 실행 → faster-whisper(medium)로 전사 → 파싱 → 파일별 `*_review.csv` 생성.
 2. 그날의 PDF 답안지 텍스트를 파일로 저장해두고 `compare_with_answer_key.py`로 대조 — 누락/오류 목록을 바로 받는다.
 3. 누락된 단어는 PDF 답안지의 뜻을 그대로 가져와 CSV에 보완(오디오 재시도보다 훨씬 빠르고 확실함). 그 외 ⚠️ 플래그 항목은 사람이 훑어본다.
-4. 검수 끝난 CSV들을 읽어 Supabase에 upsert하는 스크립트(별도 작성 예정, 이 저장소 `scripts/`에 위치) 실행 — `vocab_batches`에 배치 하나씩(`title = 'DAY 01 일괄 가져오기'` 등, `status = 'confirmed'`)를 만들고 그 아래로 `vocab_words`/`vocab_batch_items`를 채운다. `vocab_words`의 `unique(child_id, korean, english)` 제약 덕에 이후 사진으로 같은 단어가 다시 들어와도 자동 병합된다.
+4. ~~검수 끝난 CSV들을 읽어 Supabase에 upsert하는 스크립트~~ → **완료(2026-09-14)**: [`scripts/import_vocab_csv.py`](../scripts/import_vocab_csv.py)(이 저장소)가 `vocab_batches`에 배치 하나씩(`title = '능률보카 중등기본 DAY 01'` 등, `status = 'confirmed'`)를 만들고 그 아래로 `vocab_words`/`vocab_batch_items`를 채운다. `vocab_words`의 `unique(child_id, korean, english)` 제약 덕에 이후 사진으로 같은 단어가 다시 들어와도 자동 병합된다. 4.8 참고.
 5. Supabase에는 `service_role` 키로 서버 사이드(로컬 스크립트)에서만 쓰고, 클라이언트/앱 코드에는 노출하지 않는다.
 
 **주의**: 이 mp3가 앞으로도 반복적으로 생긴다면(예: 학원이 매번 오디오로 준다면) 이 절을 4.2와 같은 수준의 정식 파이프라인으로 승격해야 한다 — 지금은 1회성이라는 전제로 설계했다.
+
+### 4.8 (2026-09-14 결정) 이번 Phase는 사진 OCR 대신 CSV 가져오기가 등록 경로
+
+**결정**: 4.7의 CSV가 능률보카 중등기본 DAY 01~50 전체(50일치)로 완성되면서, 4.2(사진 촬영 → OCR)의 등록 경로가 이번 Phase에는 필요 없어졌다. 학원이 내주는 단어 시험이 우연히 이 시판 교재와 같아서, 사진을 찍어 OCR로 다시 읽어낼 필요 없이 이미 확보한 CSV로 바로 등록할 수 있기 때문이다.
+
+- **적용 범위**: `scripts/import_vocab_csv.py`(이 저장소)를 실행해 두 자녀(고아린, 황유니) 모두에게 동일한 단어장을 등록 완료(2026-09-14) — 자녀당 고유 단어 876개, `vocab_batches` 100개(50일×2명), `vocab_batch_items` 1752개. 스크립트는 재실행해도 안전(이미 있는 `child_id`+제목 배치는 건너뜀).
+- **4.2(사진 OCR 등록)는 제거가 아니라 보류**: 학원이 다른 책으로 바뀌거나, 앞으로 사진으로만 얻을 수 있는 새 단어장이 생기면 그때 다시 필요해진다. Azure Blob Storage(`vocakokphotos`/`vocab-photos`)와 Document Intelligence 리소스는 이미 만들어져 있으므로, 재검토 시점에는 API/UI 코드만 추가하면 된다(4.1.1, 4.2 참고) — 인프라를 다시 만들 필요는 없다.
+- **CSV 파서의 알려진 결함(4.7의 원본 CSV에 남아있음, `import_vocab_csv.py`가 임포트 시점에 방어)**: DAY_10 등 일부 파일에 (english, korean)이 완전히 동일한 행이 그대로 중복 저장돼 있었다(STT dedup 로직이 일부 파일엔 적용 안 됨) — 그대로 upsert하면 `ON CONFLICT DO UPDATE command cannot affect row a second time` 에러가 난다. `import_vocab_csv.py`는 파싱 단계에서 완전 동일한 (english, korean) 쌍만 제거하고 가져온다(같은 영어에 다른 뜻이 달린 행은 그대로 둠). 원본 CSV 자체를 고치는 것은 이 저장소가 아니라 `MP3_stt` 쪽 작업.
+- **데이터 품질**: `MP3_stt/VOCAB_AUDIT_REPORT.md`에 PDF 정답지 대조 결과 전체 일치율 86.2%로 기록돼 있다 — 완벽하지 않은 데이터라는 걸 인지하고 가져왔다(정확도를 더 높이는 건 이 저장소가 아니라 `MP3_stt`의 책임 범위, 9장 열린 질문 참고).
 
 ---
 
@@ -302,19 +312,19 @@ create index vocab_attempts_family_id_idx on vocab_attempts(family_id);
   - ~~Supabase 조직 무료 슬롯 확인~~ → **완료: 2/2 슬롯 모두 사용 중(reading-buddy, twin-choice) 확인됨(4.1.1), 리딩버디 프로젝트 공유로 결정**
   - ~~리딩버디 Supabase 프로젝트에 `vocab_*` 마이그레이션 추가~~ → **완료(2026-09-14)**: `supabase/migrations/0001_vocab_schema.sql`, `0002_vocab_rls.sql`을 사용자가 SQL Editor에서 직접 실행, 에러 없이 성공. `0003_vocab_grants.sql`(안전장치)은 미실행 — 앱 코드에서 permission denied가 나면 그때 실행
   - ~~Azure Blob Storage 계정/컨테이너 생성(비공개, Document Intelligence와 같은 리전)~~ → **완료(2026-09-14)**: 계정 `vocakokphotos`, 컨테이너 `vocab-photos`(비공개), `RG-reading-buddy`/Korea Central(Document Intelligence와 동일 리전), Standard_LRS/Hot. Azure CLI로 생성(`az login` 계정: `teddy706@m14v.microsoft.com`, 구독 "Visual Studio Enterprise 구독")
-  - 학원 단어장 사진 1~2장으로 Document Intelligence 모델 선택 테스트 — 아직 미착수(실제 단어장 사진 필요)
-  - **(선택, 순서 무관) 기존 mp3 단어장 일괄 가져오기 — 4.7, `MP3_stt` 작업 디렉터리에서 진행 중.** 이 작업은 스키마만 준비되면 앱 개발 진행 상황과 무관하게 아무 때나 돌릴 수 있다.
-- **Phase 1** — 등록 & 점검 (MVP)
-  - [ ] 1. 리딩버디 프로젝트에 Supabase 스키마 추가 (`vocab_words/batches/batch_items/attempts`)
-  - [ ] 2. Blob Storage 업로드 + SAS 토큰 발급 API
-  - [ ] 3. 사진 업로드 + Azure OCR 연동
-  - [ ] 4. OCR 결과 확인/수정 UI
-  - [ ] 5. 배치 등록(upsert) 로직
-  - [ ] 6. 점검 모드 — 타이핑 응답(한글→영어 스펠링, 채점, 요약)
-  - [ ] 7. 점검 모드 — 보기 선택 응답(디스트랙터 생성 로직 + 4지선다 UI)
-  - [ ] 8. 자녀 PIN 프로필 로그인 연동(리딩버디 계정/코드 그대로 재사용)
-  - [ ] 9. 공통 `SpeakButton`(Web Speech API 발음 재생) 컴포넌트 + 등록/점검 화면 적용
-  - [ ] 10. 아이폰 미니/아이패드 미니 실기기에서 카메라 캡처·반응형 레이아웃·PWA 설치 확인
+  - [보류, 이번 Phase 제외] 학원 단어장 사진 1~2장으로 Document Intelligence 모델 선택 테스트 — 4.8 참고, CSV 가져오기로 등록을 대신하기로 해서 당장 불필요
+  - ~~기존 mp3 단어장 일괄 가져오기 — 4.7, `MP3_stt` 작업 디렉터리에서 진행~~ → **완료(2026-09-14)**: DAY 01~50 전체 + Supabase 반영까지 끝남(4.8 참고)
+- **Phase 1** — 점검 (MVP, 등록은 CSV 가져오기로 대체 완료)
+  - [x] 1. 리딩버디 프로젝트에 Supabase 스키마 추가 (`vocab_words/batches/batch_items/attempts`)
+  - [x] 1.5. CSV 일괄 가져오기로 등록 완료(사진 OCR 등록의 대체 경로, 4.8)
+  - [보류] Blob Storage 업로드 + SAS 토큰 발급 API — 사진 등록 재도입 시 진행
+  - [보류] 사진 업로드 + Azure OCR 연동 — 사진 등록 재도입 시 진행
+  - [보류] OCR 결과 확인/수정 UI — 사진 등록 재도입 시 진행
+  - [ ] 2. 점검 모드 — 타이핑 응답(한글→영어 스펠링, 채점, 요약)
+  - [ ] 3. 점검 모드 — 보기 선택 응답(디스트랙터 생성 로직 + 4지선다 UI)
+  - [ ] 4. 자녀 PIN 프로필 로그인 연동(리딩버디 계정/코드 그대로 재사용)
+  - [ ] 5. 공통 `SpeakButton`(Web Speech API 발음 재생) 컴포넌트 + 점검 화면 적용
+  - [ ] 6. 아이폰 미니/아이패드 미니 실기기에서 반응형 레이아웃·PWA 설치 확인(카메라 테스트 제외)
 - **Phase 2** — 누적 & 게임
   - [ ] 11. 단어은행 전체 조회/통계 뷰
   - [ ] 12. 가중 랜덤 출제 게임 모드(타이핑/보기 선택 모두, 발음 듣기 포함)

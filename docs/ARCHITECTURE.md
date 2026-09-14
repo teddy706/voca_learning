@@ -4,8 +4,23 @@
 
 ## 1. 개요
 
-학원 단어장 사진을 OCR로 등록하고, 한글→영어 스펠링을 점검·게임 형태로 반복 학습시키는 PWA. 인증/DB는 자매 프로젝트 리딩버디와 Supabase 프로젝트를 공유하고, 사진 저장/OCR은 Azure로 분리한다. 자세한 배경과 근거는 [PRD.md](PRD.md) 참고.
+한글→영어 스펠링을 점검·게임 형태로 반복 학습시키는 PWA. 원래 구상은 학원 단어장 사진을 OCR로 등록하는 것이었지만, 실제 시험 범위가 시판 교재(능률보카 중등기본)와 같아서 **이번 Phase는 오디오+PDF 정답지로 이미 만들어둔 CSV를 가져오는 것으로 등록을 대신한다**(2026-09-14 결정, [PRD.md](PRD.md) 4.8). 사진 OCR 등록은 제거가 아니라 보류 — 인프라(Blob/Document Intelligence)는 이미 만들어져 있다. 인증/DB는 자매 프로젝트 리딩버디와 Supabase 프로젝트를 공유하고, 사진 저장/OCR은 Azure로 분리한다. 자세한 배경과 근거는 [PRD.md](PRD.md) 참고.
 
+**현재(이번 Phase) 실제 데이터 흐름**:
+```
+MP3_stt/voca_mp3/*_review.csv (오디오 STT + PDF 정답지 대조로 이미 완성)
+   │
+   ▼
+scripts/import_vocab_csv.py (이 저장소, 완료·2026-09-14)
+   │
+   ▼
+[Supabase: vocab_words / vocab_batches(status=confirmed) / vocab_batch_items]
+   │
+   ▼
+[점검 모드 / 랜덤 게임 모드] ──▶ [vocab_attempts 기록]
+```
+
+**보류 중인 흐름(사진 OCR 재도입 시)**:
 ```
 [클라이언트 PWA]
    │  사진 업로드
@@ -19,9 +34,6 @@
                           │ 확정
                           ▼
         [Supabase: vocab_words / vocab_batches / vocab_batch_items]
-                          │
-                          ▼
-        [점검 모드 / 랜덤 게임 모드] ──▶ [vocab_attempts 기록]
 ```
 
 ## 2. 기술 스택
@@ -40,24 +52,30 @@
 | 테스트 | Vitest ^2.1.9 (리딩버디/twin-choice 인프라 재사용) |
 | PWA 매니페스트 | `public/manifest.json` + `public/icons/*`(192/512/maskable/apple-touch), `layout.tsx`의 `metadata.manifest`/`viewport` — 리딩버디와 동일 구조로 포팅 |
 
-## 3. 디렉터리 구조 (계획, 착수 후 갱신)
+## 3. 디렉터리 구조
 
 ```
 voca_learning/
 ├── CLAUDE.md
+├── .env.local              # 실제 값(gitignored) — Supabase/Azure 키
+├── .env.local.example      # 커밋된 템플릿
 ├── docs/
 │   ├── PRD.md
 │   ├── BRIEF.md
 │   ├── STORIES.md
 │   ├── ARCHITECTURE.md
 │   └── NEW_APP_TOKEN_EFFICIENCY_GUIDE.md
-├── scripts/            # 4.7 일회성 가져오기 upsert 스크립트 (예정)
+├── scripts/
+│   └── import_vocab_csv.py  # 완료(2026-09-14) — CSV → Supabase 일괄 가져오기, 재실행 안전
 ├── supabase/
-│   └── migrations/     # vocab_* 스키마 (예정)
-└── src/                # 앱 코드 (착수 후 리딩버디 구조 참고해 채움)
+│   └── migrations/
+│       ├── 0001_vocab_schema.sql  # 적용 완료
+│       ├── 0002_vocab_rls.sql     # 적용 완료
+│       └── 0003_vocab_grants.sql  # 안전장치, 미적용(불필요했음)
+└── src/                # 앱 코드 (아직 없음 — Phase 1 점검 모드부터 시작)
 ```
 
-관련 1회성 작업(오디오 STT/PDF 대조)은 이 저장소가 아니라 별도 작업 디렉터리 `/Users/gwanghee/Documents/110_Github/MP3_stt`에 있다 — 완성된 CSV를 이 저장소의 upsert 스크립트가 읽어 Supabase에 반영한다.
+관련 1회성 작업(오디오 STT/PDF 대조)은 이 저장소가 아니라 별도 작업 디렉터리 `/Users/gwanghee/Documents/110_Github/MP3_stt`에 있다 — 완성된 CSV(`voca_mp3/*_review.csv`)를 이 저장소의 `scripts/import_vocab_csv.py`가 읽어 Supabase에 반영했다(완료).
 
 ## 4. 인증 구조 (2026-09-14, 리딩버디 실제 코드 확인 완료)
 

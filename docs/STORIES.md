@@ -1,10 +1,12 @@
 # 사용자 스토리 — 단어콕(가칭)
 
-상태 표기: `[ ]` 미착수 / `[~]` 진행 중 / `[x]` 완료. 2026-09-14 기준 전부 미착수(Phase 0).
+상태 표기: `[ ]` 미착수 / `[~]` 진행 중 / `[x]` 완료 / `[보류]` 이번 Phase 스코프 제외.
 
 ---
 
-## 에픽 1. 사진 등록 & OCR
+## 에픽 1. 사진 등록 & OCR — [보류] 이번 Phase 제외 (2026-09-14)
+
+능률보카 중등기본 DAY 01~50 CSV(에픽 6)로 등록을 대신하기로 해서, 이 에픽 전체를 이번 Phase에서 뺐다. 학원이 다른 책으로 바뀌거나 사진으로만 얻을 수 있는 새 단어장이 생기면 재검토 — 그때 필요한 Azure Blob Storage/Document Intelligence 리소스는 이미 만들어져 있음([PRD.md](PRD.md) 4.8).
 
 ### US-1.1 사진 업로드
 - [ ] 부모 또는 자녀(PIN 로그인 상태)가 학원 단어장을 카메라/갤러리로 촬영·업로드한다.
@@ -102,20 +104,21 @@
 
 ---
 
-## 에픽 6. 기존 오디오 단어장 일괄 가져오기 (1회성, `MP3_stt` 작업 디렉터리)
+## 에픽 6. 기존 오디오 단어장 일괄 가져오기 — 사진 등록을 대신하는 이번 Phase의 실제 등록 경로
 
 ### US-6.1 오디오 STT 파싱
-- [x] faster-whisper(medium)로 능률보카 중등기본 DAY_01~06 mp3를 전사·파싱해 리뷰 CSV 생성 — 완료 (2026-09-14).
+- [x] faster-whisper(medium)로 능률보카 중등기본 DAY_01~50 mp3 전체를 전사·파싱해 리뷰 CSV 생성 — 완료 (2026-09-14, `MP3_stt` 작업 디렉터리).
 - 근거: [PRD.md](PRD.md) 4.7
 
 ### US-6.2 PDF 정답지 대조 검증
-- [x] `compare_with_answer_key.py`로 PDF 답안지의 영어 표제어 집합과 리뷰 CSV를 대조해 누락/오류 자동 검출 — DAY_01~06 완료.
+- [x] `compare_with_answer_key.py`로 PDF 답안지의 영어 표제어 집합과 리뷰 CSV를 대조해 누락/오류 자동 검출 — 전체 일치율 86.2%로 `MP3_stt/VOCAB_AUDIT_REPORT.md`에 기록됨. 완벽하지 않은 데이터라는 걸 인지하고 그대로 가져옴(9장 열린 질문 참고, 정확도 개선은 이 저장소 책임 밖).
 - 근거: [PRD.md](PRD.md) 4.7 "핵심 업데이트"
 
 ### US-6.3 나머지 44개 파일 처리
-- [ ] DAY_07~50 오디오 파싱 + (선택적) PDF 대조 검증.
+- [x] DAY_07~50 오디오 파싱 완료 — 전체 50개 파일 리뷰 CSV 확보.
 - 근거: [PRD.md](PRD.md) 9장 열린 질문
 
 ### US-6.4 Supabase upsert 스크립트
-- [ ] 검수 완료 CSV를 읽어 `vocab_batches`(status='confirmed')/`vocab_words`/`vocab_batch_items`로 upsert하는 로컬 스크립트 작성(이 저장소 `scripts/`).
-- 근거: [PRD.md](PRD.md) 4.7 흐름 4단계
+- [x] [`scripts/import_vocab_csv.py`](../scripts/import_vocab_csv.py) 작성 및 실행 완료 (2026-09-14) — `MP3_stt/voca_mp3/*_review.csv` 50개 파일을 읽어 두 자녀(고아린, 황유니) 모두에게 `vocab_batches`(status='confirmed')/`vocab_words`/`vocab_batch_items`로 upsert. 결과: 자녀당 고유 단어 876개, 배치 100개, batch_item 1752개. 재실행해도 안전(idempotent).
+- 구현 메모: 원본 CSV 일부(DAY_10 등)에 (영어,한글) 완전 동일 중복 행이 남아있어 `ON CONFLICT` 에러가 났음 — 스크립트가 파싱 단계에서 완전 동일 쌍만 제거하도록 방어 처리함.
+- 근거: [PRD.md](PRD.md) 4.7 흐름 4단계, 4.8
