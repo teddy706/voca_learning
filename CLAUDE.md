@@ -52,9 +52,9 @@ OCR은 `src/lib/documentIntelligence.ts`의 `analyzeImage()` REST 폴링 패턴�
 - [x] 1. 리딩버디 Supabase 프로젝트에 vocab_ 스키마 추가 (vocab_words/batches/batch_items/attempts, answer_mode 포함) — 완료, 위 Phase 0 체크리스트 참고
 - [x] 1.5. CSV 일괄 가져오기로 단어 등록 완료 (사진 OCR 등록의 대체 경로) — 완료, 위 참고
 - [x] 1.7. **Next.js 앱 스캐폴딩 완료 (2026-09-14)** — 아래 "앱 스캐폴딩 현황" 참고
-- [ ] 2. 점검 모드 — 타이핑 응답(한글→영어 스펠링, 채점, 요약)
+- [~] 2. 점검 모드 — 타이핑 응답(한글→영어 스펠링, 채점, 요약) — 코드 작성 완료(2026-09-14), `npm run build` 통과, **자녀 세션에서 실제 클릭 테스트는 사용자 확인 필요**(아래 참고)
 - [ ] 3. 점검 모드 — 보기 선택 응답(디스트랙터 생성 로직 + 4지선다 UI)
-- [~] 4. 자녀 PIN 프로필 로그인 연동(리딩버디 계정 그대로 재사용) — 코드는 포팅 완료(1.7 참고), **실제 계정으로 로그인 테스트는 아직 사용자 확인 필요**(비밀번호/PIN을 에이전트가 알 수 없음)
+- [x] 4. 자녀 PIN 프로필 로그인 연동(리딩버디 계정 그대로 재사용) — **사용자가 실제 계정으로 로그인→프로필 선택→PIN→홈 화면(단어 개수 표시)까지 확인 완료(2026-09-14)**
 - [ ] 5. 공통 `SpeakButton`(Web Speech API 발음 재생) 컴포넌트 + 점검 화면 적용
 - [ ] 6. 아이폰 미니/아이패드 미니 실기기에서 반응형 레이아웃·PWA 설치 확인(카메라 테스트는 제외 — 사진 등록 없음)
 
@@ -65,7 +65,12 @@ Next.js 14.2.35(App Router) + TS + Tailwind로 초기화, `npm install`/`npm run
 - **UI 컴포넌트(리딩버디 패턴 포팅, 사진 아바타 등 불필요한 부분은 단순화)**: `Avatar`(emoji만), `LogoutButton`, `PinKeypad`/`PinConfirmButton`/`PinDots`, `PinEntry`. `globals.css`의 `app-shell`/`card`/`input`/`btn*`/`profile-card` 컴포넌트 클래스도 색상만 바꿔 그대로 포팅(PRD 4.5 반응형/터치타겟 요건을 이미 만족하는 검증된 패턴)
 - **페이지**: `/`(role별 리다이렉트) → `/login`(부모 로그인) → `/profiles`(자녀 선택) → `/profiles/[id]/pin`(PIN) → `/home`(자녀 홈, `vocab_words`/`vocab_batches` 개수를 실제로 조회해 보여줌 — DB 연결까지 검증됨)
 - **브라우저 확인**: `/login` 페이지 렌더링 확인(스타일 정상 적용). **부모 실제 로그인·PIN 입력은 비밀번호/PIN을 에이전트가 모르므로 테스트 못 함 — 사용자가 직접 `npm run dev` 후 `http://localhost:3000`에서 로그인→프로필 선택→PIN 입력→홈까지 확인 필요**
-- **미완성/TODO**: `public/manifest.json`의 `icons: []`(아이콘 세트 없음, 리딩버디도 초기엔 이랬음 — 나중에 채울 것), 점검 모드 화면 자체는 아직 없음(다음 항목)
+- **미완성/TODO**: `public/manifest.json`의 `icons: []`(아이콘 세트 없음, 리딩버디도 초기엔 이랬음 — 나중에 채울 것)
+
+### 점검 모드 — 타이핑 응답 (2026-09-14, 코드 작성 완료)
+- `/home` → "점검 시작하기" → `/check`(단어장=배치 목록, `child_id`로 한 번 더 좁혀 형제자매 배치가 안 보이게 함) → `/check/[batchId]`(한글 제시 → 영어 입력 → Enter/확인 → 서버 채점) → 전부 풀면 요약(정답 개수 + 오답 목록) 화면.
+- 채점은 **서버(`/api/vocab-attempts`)가 authoritative** — 클라이언트가 보낸 정오답을 믿지 않고 `vocab_words.english`를 직접 조회해 trim+대소문자 무시로 비교, 그 결과로 `vocab_attempts`에 기록.
+- **사용자 확인 필요**: 자녀 계정으로 `/check` → 아무 단어장 선택 → 몇 문제 풀어보고 (a) 정답/오답 판정이 맞는지, (b) 세션 끝나고 `vocab_attempts`에 기록되는지 확인 부탁.
 
 ### 보류 (이번 Phase 제외, 필요해지면 재검토)
 - 사진 업로드(Blob) + Azure OCR 연동

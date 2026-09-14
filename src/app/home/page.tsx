@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireChildProfile } from "@/lib/currentProfile";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
@@ -32,9 +33,9 @@ export default async function HomePage() {
           <p className="mt-1 text-sm text-soft">{batchCount ?? 0}개 DAY 단어장</p>
         </div>
 
-        <div className="card text-center text-soft">
-          점검 모드는 곧 추가될 예정이에요. 조금만 기다려주세요!
-        </div>
+        <Link href="/check" className="btn btn-primary mb-0">
+          점검 시작하기
+        </Link>
 
         <div className="mt-auto flex flex-col gap-2 md:mx-auto md:w-full md:max-w-xs">
           <LogoutButton />
