@@ -73,10 +73,11 @@ voca_learning/
 │   ├── 0003_vocab_grants.sql       # 안전장치, 미적용(불필요했음)
 │   ├── 0004_vocab_arrange_mode.sql # 적용 완료 — answer_mode에 'arrange' 추가
 │   ├── 0005_vocab_stars.sql        # 적용 완료 — vocab_stars 테이블
-│   └── 0006_vocab_word_marks.sql   # 적용 완료 — vocab_word_marks 테이블(복습 알아요/몰라요)
+│   ├── 0006_vocab_word_marks.sql   # 적용 완료 — vocab_word_marks 테이블(복습 알아요/몰라요)
+│   └── 0007_atomic_counters.sql    # 적용 완료 — record_pin_failure/increment_vocab_star 함수(11장)
 ├── voca_mp3/*_review.csv   # import_vocab_csv.py의 입력(mp3 원본은 gitignore)
 ├── test/stubs/server-only.ts
-├── public/manifest.json    # icons: [] — 아직 아이콘 세트 없음(TODO)
+├── public/manifest.json    # 아이콘 세트 완료(accent 배경 + "ABC", 4장 참고)
 └── src/
     ├── middleware.ts               # 리딩버디에서 diff 없이 그대로 복사
     ├── lib/
@@ -160,6 +161,11 @@ voca_learning/
 
 전 테이블 `family_id`를 직접 들고 있다 — 리딩버디의 `reading_records` 등 기존 테이블과 동일한 비정규화 패턴(6장 참고). 통계/오답노트는 별도 테이블 없이 `vocab_attempts` 집계 뷰로 처리(가이드 2.4 원칙).
 
+### 5.1 원자적 카운터 함수 (0007, 2026-09-14 코드 리뷰 후 추가)
+"현재 값을 SELECT로 읽고 애플리케이션에서 +1 계산 후 UPDATE/INSERT"는 동시 요청에서 값이 유실되는 레이스가 있다 — 특히 PIN 실패 카운터는 이게 "5회 실패 시 잠금" 정책 자체를 무력화할 수 있어 심각했다(12장 참고). 두 Postgres 함수로 읽기+쓰기를 한 문장에 합쳐 원자적으로 만들었다:
+- `public.record_pin_failure(p_profile_id, p_max_attempts, p_lock_ms)` — `profiles.pin_fail_count`를 원자적으로 +1하고, 임계값 도달 시 같은 트랜잭션에서 잠금까지 건다. `service_role`(admin 클라이언트)로만 호출 — RLS는 어차피 우회되므로 SECURITY 속성은 중요하지 않다.
+- `public.increment_vocab_star(p_family_id, p_child_id, p_batch_id, p_mode)` — `vocab_stars`에 `INSERT ... ON CONFLICT (child_id, batch_id, mode) DO UPDATE`로 원자적 증가. **일부러 SECURITY INVOKER(기본값)로 만듦** — 호출자(부모/자녀)의 RLS를 그대로 적용받아야 하기 때문. SECURITY DEFINER로 만들면 함수 안의 INSERT/UPDATE가 RLS를 통째로 우회해서 "아무나 아무 자녀의 별을 조작 가능"이라는, 고치려던 레이스보다 훨씬 심각한 구멍이 새로 생긴다.
+
 ## 6. RLS 정책 (2026-09-14, 기존 헬퍼 함수 확인 후 확정)
 
 리딩버디 `0002_functions_triggers.sql`에 이미 있는 `public.my_family_id()` / `public.my_role()` / `public.my_profile_id()`(모두 `security definer`, `auth.uid()` 기준)를 새로 만들지 않고 그대로 재사용한다:
@@ -209,6 +215,7 @@ Phase 1/2 범위에는 실시간 동기화 요구사항이 없음(twin-choice의
 
 - Vitest 인프라를 리딩버디/twin-choice에서 그대로 포팅.
 - `src/lib/distractors.test.ts` — 4지선다 디스트랙터 생성 로직(순수 함수, PRD 4.3.1) 유닛 테스트 완료(7개, 전부 통과).
+- **`/code-review high` 1회 실시 (2026-09-14)** — 전체 diff를 8개 관점(정확성 3·재사용/단순화/효율성 3·구조 깊이·CLAUDE.md 준수) 병렬 에이전트로 검증, 확정 10건 전부 수정 완료(레이스 컨디션 4건, 접근 제어/일관성 2건, 방어적 코딩 4건 — 상세는 CLAUDE.md "`/code-review high` 결과 및 수정" 절 참고). 새 DB 함수 2개(`record_pin_failure`/`increment_vocab_star`)는 실제 REST API 호출로 원자적 증가 동작까지 검증함.
 
 ## 12. 알려진 함정 (재발 방지용 기록)
 
@@ -219,5 +226,8 @@ Phase 1/2 범위에는 실시간 동기화 요구사항이 없음(twin-choice의
 - **`storage.objects`는 일반 SQL `delete`로 못 지운다**(`storage.protect_delete()` 트리거가 막음). Azure Blob은 이 트리거의 영향을 받지 않지만(Supabase Storage가 아니므로), 혹시 사진 캐시 등을 Supabase Storage에 놓게 되면 이 함정이 재발할 수 있음 — Storage REST API로 지울 것.
 - **자녀 로그인은 `CHILD_AUTH_SECRET`/`childProfileEmail()`이 리딩버디와 정확히 일치해야 동작**([4장](#4-인증-구조-2026-09-14-리딩버디-실제-코드-확인-완료) 참고) — 이 프로젝트에서 겪을 가능성이 가장 높은 함정이라 별도로 강조.
 - **마이그레이션은 `supabase db push`가 아니라 SQL Editor 수동 실행**으로 적용해왔다(리딩버디 관례 그대로 따름) — 새 마이그레이션을 추가할 때마다 "사용자가 SQL Editor에서 직접 실행해야 실제 DB에 반영됨"을 잊지 말 것.
+- **"현재 값 SELECT → 애플리케이션에서 +1 → UPDATE/INSERT"는 동시 요청에서 값이 유실되는 레이스가 있다**(2026-09-14 코드 리뷰에서 발견 — PIN 실패 카운터가 특히 심각했다: 동시에 여러 번 틀리면 "5회 실패 시 잠금" 정책 자체가 무력화될 수 있었음). 카운터를 늘리거나 upsert하는 새 로직을 짤 때는 처음부터 단일 SQL 문(원자적 증가 DB 함수, 또는 산술이 필요 없으면 `.upsert()`)으로 만들 것 — "select 후 write"는 나중에 고치는 게 아니라 처음부터 피할 것.
+- **원자적 증가 DB 함수는 SECURITY DEFINER로 만들지 말 것**(0007_atomic_counters.sql 참고) — 호출자(부모/자녀)가 RLS를 그대로 적용받아야 하는 함수(`increment_vocab_star`처럼)를 DEFINER로 만들면 함수 안 INSERT/UPDATE가 RLS를 통째로 우회해서, 고치려던 레이스 버그보다 훨씬 심각한 "아무나 아무 자녀 데이터를 조작 가능" 취약점이 새로 생긴다. `service_role` 전용으로만 호출되는 함수(`record_pin_failure`처럼, 어차피 RLS를 우회하는 role)만 이 제약에서 자유롭다.
+- **PostgREST가 방금 만든 함수를 "찾을 수 없음"이라고 하면 캐시 지연이 아니라 실행이 실제로 안 됐을 가능성부터 의심할 것**: `0007_atomic_counters.sql`을 처음 실행했을 때 `record_pin_failure`는 만들어졌는데 `increment_vocab_star`는 계속 `PGRST202`(함수를 찾을 수 없음)를 냈다 — 몇 초 기다려도 그대로였다. 파일 전체를 다시 실행하니 해결됨(원인 불명, 아마 붙여넣기 일부 누락). 여러 함수/문장이 든 마이그레이션에서 일부만 반영된 것 같으면, 캐시 갱신을 기다리지 말고 전체 파일을 통째로 재실행해볼 것(`create or replace`는 재실행해도 안전).
 - **`npm run dev`가 떠 있는 상태에서 `npm run build`를 돌리면 `.next` 캐시가 깨진다** (2026-09-14 두 번 실제로 겪음): 둘 다 같은 `.next/` 디렉터리를 쓰는데 프로덕션 빌드가 그 안의 dev 전용 파일을 덮어써서, dev 서버가 `Cannot find module './NNN.js'`나 `Cannot read properties of null (reading 'useContext')` 같은 에러를 내며 죽는다. 이미 브라우저에 로드된 페이지는 옛 청크를 계속 참조하니 서버를 고쳐도 브라우저 쪽엔 강제 새로고침이 필요하다. **대응**: dev 서버가 떠 있는 동안에는 `npm run build`를 돌리지 말 것 — 코드 검증은 `npx tsc --noEmit` + `npx vitest run` + `npx next lint`로 충분하다(전부 `.next`를 건드리지 않음). 정말 프로덕션 빌드를 확인해야 하면 dev 서버를 먼저 멈추고, 빌드 후 다시 `rm -rf .next && npm run dev`로 깨끗하게 재시작할 것.
 - **PostgREST `.in()` 필터에 UUID를 수백 개 이상 나열하면 요청이 조용히 실패한다**(2026-09-14 실제로 겪음): `/check` 목록의 학습 이력 요약(`vocabBatch.ts#getBatchHistorySummaries`)이 자녀 전체 단어(876개)의 `word_id`를 `.in()`에 나열했는데, UUID 876개 ≈ 32,000자짜리 쿼리 문자열이 되면서 요청이 실패했다. `{ data }`만 구조분해하고 `error`를 확인하지 않아서 화면엔 그냥 "학습 이력 없음"으로만 보였고, 원인을 좁히는 데 디버그 로그를 심어 재현하는 과정이 필요했다. **대응**: (1) `.in()` 배열이 배치 하나 분량(수십 개)을 넘어설 수 있는 자리에는 ID 목록으로 좁히지 말고 `child_id`처럼 이미 작은 컬럼 하나로 통째로 가져와 애플리케이션에서 조인할 것. (2) supabase-js 호출은 항상 `{ data, error }`를 구조분해해서 `error`를 `console.error`로 남길 것 — 그래야 이런 실패가 "결과 0건"으로 위장되지 않는다.

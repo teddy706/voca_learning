@@ -314,6 +314,13 @@ create index vocab_attempts_family_id_idx on vocab_attempts(family_id);
 - **별(⭐) 보상**: 한 세션에서 오답 없이 만점을 받으면 별 1개, 반복해서 만점을 받을 때마다 계속 쌓인다. 저장 위치는 사용자가 "DB에 영구 저장"을 선택 — 기기를 바꾸거나 로그아웃해도 유지된다(`vocab_stars` 테이블, child_id+batch_id+mode당 카운터).
 - **부모 계정으로 미리보기**: 부모가 PIN 없이 특정 자녀의 복습/시험 화면을 그대로 써볼 수 있다(자녀 대신 테스트/확인 용도). 리딩버디의 "부모는 가족 전체 자녀를 대신해 조회/수정 가능" 패턴을 점검 모드까지 확장한 것.
 
+### 4.10 (2026-09-14) `/code-review high` 1회 실시 — 레이스 컨디션·접근 제어 하드닝
+
+점검 모드가 4.9 형태로 안정된 뒤, 지금까지의 전체 diff를 코드 리뷰 스킬로 검증했다. 확정된 10건(레이스 컨디션 4건 — PIN 잠금 우회·별/단어표시 카운터 유실, 접근 제어/일관성 2건, 방어적 코딩 4건)을 모두 수정했다. 요구사항 변경은 없고 기존 기능의 견고성만 높인 작업이라 이 문서엔 요약만 남긴다 — findings 원문과 수정 내역은 [CLAUDE.md](../CLAUDE.md) "`/code-review high` 결과 및 수정" 절, DB 설계 변경(신규 원자적 카운터 함수 2개)은 [ARCHITECTURE.md](./ARCHITECTURE.md) 5.1절을 참고.
+
+- 새 마이그레이션 `0007_atomic_counters.sql` 추가(`record_pin_failure`/`increment_vocab_star`) — "select 후 애플리케이션에서 +1" 패턴을 원자적 Postgres 함수로 교체.
+- 그 외 수정은 전부 기존 코드의 방어 강화(null 체크, RLS 스코프 좁히기, UI 이중 제출 방지)로, 사용자가 체감하는 동작 변화는 없다.
+
 ---
 
 ## 5. Phase 로드맵

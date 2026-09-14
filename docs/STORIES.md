@@ -142,3 +142,17 @@
 - [x] [`scripts/import_vocab_csv.py`](../scripts/import_vocab_csv.py) 작성 및 실행 완료 (2026-09-14, 이후 캐릭터 4명으로 확장) — `MP3_stt/voca_mp3/*_review.csv` 50개 파일을 읽어 이 family의 role=child 캐릭터 전원(고아린/황유니/아빠/정보라)에게 `vocab_batches`(status='confirmed')/`vocab_words`/`vocab_batch_items`로 upsert. 결과: 캐릭터당 고유 단어 876개, 배치 200개, batch_item 3504개. 하드코딩 목록 대신 family_id로 role=child를 동적 조회 — 재실행해도 안전(idempotent)하고 새 캐릭터도 자동 포함.
 - 구현 메모: 원본 CSV 일부(DAY_10 등)에 (영어,한글) 완전 동일 중복 행이 남아있어 `ON CONFLICT` 에러가 났음 — 스크립트가 파싱 단계에서 완전 동일 쌍만 제거하도록 방어 처리함.
 - 근거: [PRD.md](PRD.md) 4.7 흐름 4단계, 4.8
+
+---
+
+## 에픽 7. 하드닝 — `/code-review high` 1회 실시 (2026-09-14)
+
+새 유저 스토리 없음 — 기존 기능(에픽 2)의 견고성을 높인 작업. 확정 10건(레이스 컨디션 4건, 접근 제어/일관성 2건, 방어적 코딩 4건) 전부 수정 완료, 사용자가 체감하는 동작 변화는 없음.
+
+### US-7.1 카운터 레이스 컨디션 제거
+- [x] PIN 실패 잠금, 별(⭐) 적립, 단어 알아요/몰라요 표시가 동시 요청에서 값을 잃지 않도록 "select 후 +1" 패턴을 원자적 DB 함수/upsert로 교체.
+- 근거: [PRD.md](PRD.md) 4.10 / [ARCHITECTURE.md](ARCHITECTURE.md) 5.1 / CLAUDE.md "`/code-review high` 결과 및 수정"
+
+### US-7.2 그 외 방어적 코딩/접근 제어 보강
+- [x] 시험 3종의 이중 제출/이중 넘어가기 방지, `getWordMarks` URL 길이 초과로 인한 조용한 실패 수정, 부모 홈 화면 접근 제어를 `/check`와 동일한 패턴으로 정리.
+- 근거: 위와 동일
