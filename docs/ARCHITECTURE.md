@@ -116,7 +116,7 @@ voca_learning/
 
 관련 1회성 작업(오디오 STT/PDF 대조)은 이 저장소가 아니라 별도 작업 디렉터리 `/Users/gwanghee/Documents/110_Github/MP3_stt`에 있다 — 완성된 CSV를 `voca_mp3/`로 복사해와 `scripts/import_vocab_csv.py`가 Supabase에 반영했다(완료).
 
-**검증 상태**: `npm run build` / `npx tsc --noEmit` 통과, `/login` 페이지 브라우저 렌더링 확인. 부모 이메일/PIN 로그인의 실제 동작은 자격 증명을 에이전트가 알 수 없어 미검증 — 사용자가 `npm run dev`로 직접 확인 필요.
+**검증 상태**: `npm run build` / `npx tsc --noEmit` 통과. 사용자가 실제 계정(부모/자녀 PIN)으로 로그인→점검까지 전체 플로우 확인 완료. **프로덕션 배포 완료(2026-09-14)**: GitHub(`teddy706/voca_learning`, private) → Vercel(`teddy706s-projects/voca-learning`, https://voca-learning-blush.vercel.app) 연동, 환경변수 등록 후 `/` → `/login` 서버사이드 Supabase 체크까지 실제 브라우저로 확인.
 
 ## 4. 인증 구조 (2026-09-14, 리딩버디 실제 코드 확인 완료)
 

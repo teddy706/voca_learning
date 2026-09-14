@@ -2,6 +2,12 @@
 
 **Phase 0(착수 준비)은 사실상 끝났고, 지금은 Phase 1(앱 코드 작성) 진행 중입니다.** 단, **사진 촬영 → OCR 등록 경로는 이번 Phase에서 제외**(2026-09-14 사용자 결정, 아래 표 참고) — Blob/Document Intelligence 관련 API·UI는 지금 만들지 마세요. Phase 2, Phase 3도 이 시점에 손대지 마세요.
 
+## 배포 (2026-09-14)
+- **GitHub**: https://github.com/teddy706/voca_learning (private, reading-buddy와 동일 관례). `main` 브랜치 push마다 Vercel 자동 재배포.
+- **Vercel**: https://voca-learning-blush.vercel.app — 프로덕션. `teddy706s-projects` 팀, `regions: ["icn1"]`(서울) 정상 적용 확인(`x-vercel-id` 헤더로 검증).
+- 환경변수 9개(`.env.local`과 동일 키)는 **사용자가 Vercel 대시보드에서 직접 등록**(에이전트가 API 키/시크릿을 대신 입력하지 않음 — 리딩버디 관례 및 안전 정책). 등록 후 재배포해서 `/login` 페이지가 서버사이드 Supabase 체크(`/` → `/login` 리다이렉트)까지 정상 동작함을 실제 브라우저로 확인함.
+- 로컬 배포 CLI 명령: `vercel --prod --yes`(dev 서버와 별개로 언제든 실행 가능 — `.next`를 공유하는 `npm run build`와 달리 Vercel CLI는 원격에서 독립적으로 빌드하므로 로컬 dev 서버에 영향 없음).
+
 ## 프로젝트 개요
 초등 3학년 쌍둥이 자녀(고아린, 황유니)의 학원 영단어 시험 대비 암기 점검 앱. 원래는 학원 단어장을
 사진으로 등록(OCR)하는 걸 목표로 했으나, 능률보카 중등기본(DAY 01~50) 단어를 이미 CSV로 정리해둔
