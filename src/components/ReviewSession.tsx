@@ -153,7 +153,7 @@ export function ReviewSession({
         <button type="button" onClick={prev} disabled={index === 0} className="btn btn-outline mb-0 flex-1">
           이전
         </button>
-        <button type="button" onClick={next} className="btn btn-ghost mb-0 flex-1">
+        <button type="button" onClick={next} className="btn btn-outline mb-0 flex-1">
           건너뛰기
         </button>
       </div>
