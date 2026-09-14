@@ -3,11 +3,12 @@ import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/currentProfile";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
+import { BackLink } from "@/components/BackLink";
 import type { Profile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-async function BatchList({ childId, backHref }: { childId: string; backHref: string }) {
+async function BatchList({ childId }: { childId: string }) {
   const supabase = createClient();
   const { data: batches } = await supabase
     .from("vocab_batches")
@@ -33,10 +34,6 @@ async function BatchList({ childId, backHref }: { childId: string; backHref: str
       {(!batches || batches.length === 0) && (
         <p className="mb-4 text-center text-sm text-soft">아직 등록된 단어장이 없어요.</p>
       )}
-
-      <Link href={backHref} className="btn btn-ghost mt-auto mb-0">
-        {backHref === "/home" ? "홈으로" : "다른 자녀 고르기"}
-      </Link>
     </>
   );
 }
@@ -50,9 +47,10 @@ export default async function CheckBatchListPage({ searchParams }: { searchParam
     return (
       <div className="app-shell">
         <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
+          <BackLink href="/home" />
           <h1 className="mb-1 mt-1 text-center text-2xl font-bold">단어장 점검</h1>
           <p className="mb-6 text-center text-sm text-soft">점검할 단어장을 골라주세요</p>
-          <BatchList childId={requester.id} backHref="/home" />
+          <BatchList childId={requester.id} />
         </div>
       </div>
     );
@@ -70,6 +68,7 @@ export default async function CheckBatchListPage({ searchParams }: { searchParam
     return (
       <div className="app-shell">
         <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
+          <BackLink href="/profiles" />
           <h1 className="mb-1 mt-1 text-center text-2xl font-bold">누구 단어장을 볼까요?</h1>
           <p className="mb-6 text-center text-sm text-soft">부모 계정으로 자녀 화면을 미리 볼 수 있어요</p>
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -80,9 +79,6 @@ export default async function CheckBatchListPage({ searchParams }: { searchParam
               </Link>
             ))}
           </div>
-          <Link href="/profiles" className="btn btn-ghost mt-auto mb-0">
-            뒤로
-          </Link>
         </div>
       </div>
     );
@@ -101,9 +97,10 @@ export default async function CheckBatchListPage({ searchParams }: { searchParam
   return (
     <div className="app-shell">
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
+        <BackLink href="/check" />
         <p className="mb-1 mt-1 text-center text-sm text-soft">{child.name} 미리보기</p>
         <h1 className="mb-6 text-center text-2xl font-bold">단어장 점검</h1>
-        <BatchList childId={child.id} backHref="/check" />
+        <BatchList childId={child.id} />
       </div>
     </div>
   );

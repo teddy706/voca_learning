@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/currentProfile";
 import { createClient } from "@/lib/supabase/server";
 import { resolveActingChild } from "@/lib/vocabAuth";
+import { BackLink } from "@/components/BackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function CheckModeHubPage({ params }: { params: { batchId: 
   return (
     <div className="app-shell">
       <div className="mx-auto w-full max-w-lg flex-1">
+        <BackLink href="/check" />
         {acting.requester.role === "parent" && (
           <p className="mb-2 text-center text-sm text-soft">{acting.child.name} 미리보기</p>
         )}
@@ -62,10 +64,6 @@ export default async function CheckModeHubPage({ params }: { params: { batchId: 
             </Link>
           ))}
         </div>
-
-        <Link href="/check" className="btn btn-ghost mt-6 mb-0">
-          다른 단어장 고르기
-        </Link>
       </div>
     </div>
   );

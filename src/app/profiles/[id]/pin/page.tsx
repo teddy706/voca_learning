@@ -3,6 +3,7 @@ import { requireProfile } from "@/lib/currentProfile";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { PinEntry } from "@/components/PinEntry";
+import { BackLink } from "@/components/BackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function ProfilePinPage({ params }: { params: { id: string 
   return (
     <div className="app-shell justify-center">
       <div className="mx-auto w-full max-w-sm">
+        <BackLink href="/profiles" />
         <div className="mb-6 flex flex-col items-center gap-3">
           <Avatar emoji={child.avatar} size="lg" />
           <h1 className="text-2xl font-bold">{child.name}</h1>
