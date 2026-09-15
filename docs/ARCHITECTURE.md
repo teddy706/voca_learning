@@ -74,7 +74,7 @@ voca_learning/
 │   ├── 0004_vocab_arrange_mode.sql # 적용 완료 — answer_mode에 'arrange' 추가
 │   ├── 0005_vocab_stars.sql        # 적용 완료 — vocab_stars 테이블
 │   ├── 0006_vocab_word_marks.sql   # 적용 완료 — vocab_word_marks 테이블(복습 알아요/몰라요)
-│   └── 0007_atomic_counters.sql    # 적용 완료 — record_pin_failure/increment_vocab_star 함수(11장)
+│   └── 0007_atomic_counters.sql    # 적용 완료 — record_pin_failure/increment_vocab_star 함수(5.1)
 ├── voca_mp3/*_review.csv   # import_vocab_csv.py의 입력(mp3 원본은 gitignore)
 ├── test/stubs/server-only.ts
 ├── public/manifest.json    # 아이콘 세트 완료(accent 배경 + "ABC", 4장 참고)
@@ -85,21 +85,26 @@ voca_learning/
     │   ├── childAuth.ts             # 그대로 복사(diff 없음 확인) — 절대 수정 금지, 4장 경고 참고
     │   ├── currentProfile.ts        # 그대로 복사
     │   ├── vocabAuth.ts             # 이 앱 고유 — resolveActingChild(childId): 자녀 본인 또는 같은 가족 부모만 통과
-    │   ├── vocabBatch.ts            # getOwnedBatchWithWords/getChildWordPool — vocabAuth로 권한 확인 후 데이터 조회
-    │   ├── distractors.ts (+.test.ts) # 4지선다 디스트랙터 생성(순수 함수, PRD 4.3.1)
+    │   ├── vocabBatch.ts            # getOwnedBatchWithWords/getChildWordPool/getWordMarks/getBatchHistorySummaries
+    │   │                            # + getChildDashboardStats/getRecentAttempts(대시보드용, 12장)
+    │   ├── distractors.ts (+.test.ts) # 4지선다 디스트랙터(PRD 4.3.1) + buildLetterTiles(글자 배열 타일, 13장에서 데모와 공유)
+    │   ├── speech.ts                # speakEnglish() + isSpeechMuted()/setSpeechMuted()(localStorage 음소거, 2026-09-15)
+    │   ├── demoWords.ts             # 로그인 없이 체험하는 데모용 고정 DAY 1 단어 10개(13장)
     │   └── types.ts                 # Profile(리딩버디와 공유) + Vocab* 타입(이 앱 고유)
     ├── components/
     │   ├── Avatar.tsx / LogoutButton.tsx / PinKeypad.tsx / PinEntry.tsx  # 인증 UI
-    │   ├── ReviewSession.tsx        # 복습(암기) 플래시카드, 채점 없음
+    │   ├── ReviewSession.tsx        # 복습(암기) 플래시카드, 채점 없음, 🔊/🔇 음소거 토글 포함
     │   ├── CheckSession.tsx         # 시험 도전 — 타이핑
     │   ├── ChoiceSession.tsx        # 시험 도전 — 4지선다
     │   ├── ArrangeSession.tsx       # 시험 도전 — 글자 배열(탭으로 타일 배치)
-    │   └── SessionSummary.tsx       # 3개 시험 유형 공용 결과 화면 — 만점이면 /api/vocab-stars 호출
+    │   ├── SessionSummary.tsx       # 3개 시험 유형 공용 결과 화면 — 만점이면 /api/vocab-stars 호출
+    │   └── demo/DemoReviewSession.tsx, demo/DemoQuizSession.tsx  # 로그인 없는 체험판 전용(13장) — 서버 API 호출 없이 클라이언트 채점
     └── app/
         ├── layout.tsx / globals.css  # Pretendard 폰트 + app-shell/card/btn* 컴포넌트 클래스(리딩버디 포팅)
         ├── page.tsx                  # role별 리다이렉트(parent→/profiles, child→/home)
-        ├── login/page.tsx            # 부모 이메일/비밀번호 로그인
-        ├── profiles/page.tsx         # 자녀 선택 + "점검 미리보기" 링크(부모용, PIN 없이 /check?childId=)
+        ├── login/page.tsx            # 부모 이메일/비밀번호 로그인 + "회원가입 없이 DAY 1 체험하기" 링크(13장)
+        ├── demo/page.tsx, demo/{review,typing,choice,arrange}/page.tsx  # 로그인/DB 조회 없는 공개 체험판(13장)
+        ├── profiles/page.tsx         # 자녀 선택 + "점검 미리보기" 링크 + "📊 학습 현황 보기"(부모용, 12장)
         ├── profiles/[id]/pin/page.tsx
         ├── home/page.tsx             # 자녀 홈 — vocab_words/vocab_batches 개수 실조회 + "점검 시작하기"
         ├── check/page.tsx            # DAY(배치) 목록 — 자녀는 본인 것, 부모는 ?childId로 고른 자녀 것
@@ -108,11 +113,13 @@ voca_learning/
         ├── check/[batchId]/typing/page.tsx
         ├── check/[batchId]/choice/page.tsx
         ├── check/[batchId]/arrange/page.tsx
+        ├── dashboard/page.tsx, dashboard/[childId]/page.tsx  # 부모 전용 학습 현황(12장)
         └── api/
             ├── auth/{login,logout}/route.ts
             ├── children/[id]/pin/route.ts
             ├── vocab-attempts/route.ts   # 서버가 채점 authoritative, vocabAuth로 권한 확인
-            └── vocab-stars/route.ts      # 만점 시 별 카운터 증가, vocabAuth로 권한 확인
+            ├── vocab-stars/route.ts      # 만점 시 별 카운터 증가, vocabAuth로 권한 확인
+            └── vocab-word-marks/route.ts # 복습 알아요/몰라요 upsert, vocabAuth로 권한 확인
 ```
 
 관련 1회성 작업(오디오 STT/PDF 대조)은 이 저장소가 아니라 별도 작업 디렉터리 `/Users/gwanghee/Documents/110_Github/MP3_stt`에 있다 — 완성된 CSV를 `voca_mp3/`로 복사해와 `scripts/import_vocab_csv.py`가 Supabase에 반영했다(완료).
@@ -162,7 +169,7 @@ voca_learning/
 전 테이블 `family_id`를 직접 들고 있다 — 리딩버디의 `reading_records` 등 기존 테이블과 동일한 비정규화 패턴(6장 참고). 통계/오답노트는 별도 테이블 없이 `vocab_attempts` 집계 뷰로 처리(가이드 2.4 원칙).
 
 ### 5.1 원자적 카운터 함수 (0007, 2026-09-14 코드 리뷰 후 추가)
-"현재 값을 SELECT로 읽고 애플리케이션에서 +1 계산 후 UPDATE/INSERT"는 동시 요청에서 값이 유실되는 레이스가 있다 — 특히 PIN 실패 카운터는 이게 "5회 실패 시 잠금" 정책 자체를 무력화할 수 있어 심각했다(12장 참고). 두 Postgres 함수로 읽기+쓰기를 한 문장에 합쳐 원자적으로 만들었다:
+"현재 값을 SELECT로 읽고 애플리케이션에서 +1 계산 후 UPDATE/INSERT"는 동시 요청에서 값이 유실되는 레이스가 있다 — 특히 PIN 실패 카운터는 이게 "5회 실패 시 잠금" 정책 자체를 무력화할 수 있어 심각했다(14장 참고). 두 Postgres 함수로 읽기+쓰기를 한 문장에 합쳐 원자적으로 만들었다:
 - `public.record_pin_failure(p_profile_id, p_max_attempts, p_lock_ms)` — `profiles.pin_fail_count`를 원자적으로 +1하고, 임계값 도달 시 같은 트랜잭션에서 잠금까지 건다. `service_role`(admin 클라이언트)로만 호출 — RLS는 어차피 우회되므로 SECURITY 속성은 중요하지 않다.
 - `public.increment_vocab_star(p_family_id, p_child_id, p_batch_id, p_mode)` — `vocab_stars`에 `INSERT ... ON CONFLICT (child_id, batch_id, mode) DO UPDATE`로 원자적 증가. **일부러 SECURITY INVOKER(기본값)로 만듦** — 호출자(부모/자녀)의 RLS를 그대로 적용받아야 하기 때문. SECURITY DEFINER로 만들면 함수 안의 INSERT/UPDATE가 RLS를 통째로 우회해서 "아무나 아무 자녀의 별을 조작 가능"이라는, 고치려던 레이스보다 훨씬 심각한 구멍이 새로 생긴다.
 
@@ -217,7 +224,26 @@ Phase 1/2 범위에는 실시간 동기화 요구사항이 없음(twin-choice의
 - `src/lib/distractors.test.ts` — 4지선다 디스트랙터 생성 로직(순수 함수, PRD 4.3.1) 유닛 테스트 완료(7개, 전부 통과).
 - **`/code-review high` 1회 실시 (2026-09-14)** — 전체 diff를 8개 관점(정확성 3·재사용/단순화/효율성 3·구조 깊이·CLAUDE.md 준수) 병렬 에이전트로 검증, 확정 10건 전부 수정 완료(레이스 컨디션 4건, 접근 제어/일관성 2건, 방어적 코딩 4건 — 상세는 CLAUDE.md "`/code-review high` 결과 및 수정" 절 참고). 새 DB 함수 2개(`record_pin_failure`/`increment_vocab_star`)는 실제 REST API 호출로 원자적 증가 동작까지 검증함.
 
-## 12. 알려진 함정 (재발 방지용 기록)
+## 12. 부모 대시보드 (2026-09-15 추가)
+
+부모가 자녀별 학습 현황을 한눈에 보는 `/dashboard`(카드 목록) + `/dashboard/[childId]`(상세) — "부모가 학습 현황을 볼 수 있는 대시보드를 추가로 설계하고 만들자"는 요청으로 시작.
+
+- **새 쿼리**: `src/lib/vocabBatch.ts`의 `getChildDashboardStats(childId)`(단어/DAY 개수, 총 시도/정답 수, 별 합계, known/unknown 개수, 마지막 활동 시각 — count-head 쿼리 위주라 데이터 전송 없이 개수만 받아옴)와 `getRecentAttempts(childId, limit)`(최근 시도 N개, 단어 조인). 둘 다 새 RLS/마이그레이션 불필요 — 기존 `vocab_*` select 정책이 이미 "같은 가족이면 부모든 자녀든 조회 가능"이라 부모가 자녀 데이터 전체를 읽는 데 아무 문제가 없다.
+- **자녀 수가 적다는 전제로 설계**: 한 가족의 role=child는 최대 4명 정도라, `getChildDashboardStats`를 자녀별로 `Promise.all`에 태워 병렬 호출해도 무리가 없다 — `getWordMarks`/`getBatchHistorySummaries`가 경계하는 "ID 목록을 `.in()`에 수백 개 나열"(14장)과는 성격이 다른 문제(자녀 수 자체가 작음)라 그 원칙이 여기엔 적용되지 않는다.
+- **의도적으로 뺀 것**: 쌍둥이 간 순위/비교(예: "1등") — [PRD.md](PRD.md) 9장에서 랭킹은 Phase 3으로 보류하기로 한 결정과 일관되게, 자녀 카드를 나열만 하고 서로 비교하는 숫자는 만들지 않았다.
+- `/dashboard/[childId]`의 DAY별 표는 새로 안 만들고 `getBatchHistorySummaries`(기존 `/check` 목록이 쓰던 것)를 그대로 재사용 — 가이드 2.4 원칙(새 집계 로직 대신 이미 있는 걸 재사용).
+
+## 13. 회원가입 없이 체험하는 DAY 1 데모 (2026-09-15 추가)
+
+`/login` 화면에서 로그인/DB 조회 없이 바로 써볼 수 있는 공개 데모 — "로그인 첫 화면에 DAY 1을 회원가입 없이 경험할 수 있는 데모"라는 요청. `/demo`(허브: 복습 + 시험 도전 3종) → `/demo/{review,typing,choice,arrange}`.
+
+- **접근 제어 없음이 의도된 동작**: `src/middleware.ts`는 라우트별 접근 제어를 하지 않고 세션 쿠키만 갱신하므로(실제 접근 제어는 각 페이지의 `require*Profile()` 호출), `/demo/*`는 그런 호출을 아예 안 넣는 것만으로 자연히 공개 라우트가 된다 — 별도 화이트리스트/예외 처리가 필요 없었다.
+- **왜 실제 세션 컴포넌트(ReviewSession/CheckSession/ChoiceSession/ArrangeSession)를 그대로 재사용하지 않았나**: 그 컴포넌트들은 `/api/vocab-attempts`·`/api/vocab-word-marks`·`/api/vocab-stars`로 서버 채점/저장을 하는데, 데모엔 로그인 세션도 없고 단어 id(`demo-1` 등)도 실제 DB 행이 아니라서 그 API들이 원천적으로 동작할 수 없다. 대신 `src/components/demo/DemoReviewSession.tsx`/`DemoQuizSession.tsx`를 새로 만들어 **채점을 전부 클라이언트에서** 하고 아무것도 저장하지 않는다(1회성 체험이라 서버 왕복이 원래 불필요).
+- **디스트랙터/타일 생성 로직은 실제 코드와 100% 동일**: `src/lib/distractors.ts`의 `buildChoices`(기존)와 `buildLetterTiles`(2026-09-15, 원래 `ArrangeSession.tsx` 안에 있던 `buildTiles`를 승격해 공유 — 실제 화면도 이제 이 함수를 씀)를 데모와 실 서비스가 그대로 같이 쓴다. 데모가 "가짜 체험"이 아니라 실제 로직으로 동작하게 하려는 의도.
+- **데모 단어 출처**: `src/lib/demoWords.ts`에 실제 능률보카 중등기본 DAY 01(`voca_mp3/능률보카_중등기본_DAY_01_표제어_뜻_review.csv`)에서 뜻이 깨끗한 10개만 하드코딩(⚠️ 플래그·STT 오인식 항목은 첫인상용이라 제외). id는 `demo-` 접두사라 실제 `vocab_words.id`(uuid)와 절대 안 겹침 — DB 원본과 별개로 취급해도 안전.
+- **하이드레이션 버그와 수정**: 14장의 새 항목 참고.
+
+## 14. 알려진 함정 (재발 방지용 기록)
 
 리딩버디 CLAUDE.md/코드에서 이 프로젝트에도 그대로 재발할 수 있는 것만 미리 옮겨둔다. 그 외 새로 겪는 함정은 실제로 발생하는 대로 이어서 채운다.
 
@@ -231,3 +257,4 @@ Phase 1/2 범위에는 실시간 동기화 요구사항이 없음(twin-choice의
 - **PostgREST가 방금 만든 함수를 "찾을 수 없음"이라고 하면 캐시 지연이 아니라 실행이 실제로 안 됐을 가능성부터 의심할 것**: `0007_atomic_counters.sql`을 처음 실행했을 때 `record_pin_failure`는 만들어졌는데 `increment_vocab_star`는 계속 `PGRST202`(함수를 찾을 수 없음)를 냈다 — 몇 초 기다려도 그대로였다. 파일 전체를 다시 실행하니 해결됨(원인 불명, 아마 붙여넣기 일부 누락). 여러 함수/문장이 든 마이그레이션에서 일부만 반영된 것 같으면, 캐시 갱신을 기다리지 말고 전체 파일을 통째로 재실행해볼 것(`create or replace`는 재실행해도 안전).
 - **`npm run dev`가 떠 있는 상태에서 `npm run build`를 돌리면 `.next` 캐시가 깨진다** (2026-09-14 두 번 실제로 겪음): 둘 다 같은 `.next/` 디렉터리를 쓰는데 프로덕션 빌드가 그 안의 dev 전용 파일을 덮어써서, dev 서버가 `Cannot find module './NNN.js'`나 `Cannot read properties of null (reading 'useContext')` 같은 에러를 내며 죽는다. 이미 브라우저에 로드된 페이지는 옛 청크를 계속 참조하니 서버를 고쳐도 브라우저 쪽엔 강제 새로고침이 필요하다. **대응**: dev 서버가 떠 있는 동안에는 `npm run build`를 돌리지 말 것 — 코드 검증은 `npx tsc --noEmit` + `npx vitest run` + `npx next lint`로 충분하다(전부 `.next`를 건드리지 않음). 정말 프로덕션 빌드를 확인해야 하면 dev 서버를 먼저 멈추고, 빌드 후 다시 `rm -rf .next && npm run dev`로 깨끗하게 재시작할 것.
 - **PostgREST `.in()` 필터에 UUID를 수백 개 이상 나열하면 요청이 조용히 실패한다**(2026-09-14 실제로 겪음): `/check` 목록의 학습 이력 요약(`vocabBatch.ts#getBatchHistorySummaries`)이 자녀 전체 단어(876개)의 `word_id`를 `.in()`에 나열했는데, UUID 876개 ≈ 32,000자짜리 쿼리 문자열이 되면서 요청이 실패했다. `{ data }`만 구조분해하고 `error`를 확인하지 않아서 화면엔 그냥 "학습 이력 없음"으로만 보였고, 원인을 좁히는 데 디버그 로그를 심어 재현하는 과정이 필요했다. **대응**: (1) `.in()` 배열이 배치 하나 분량(수십 개)을 넘어설 수 있는 자리에는 ID 목록으로 좁히지 말고 `child_id`처럼 이미 작은 컬럼 하나로 통째로 가져와 애플리케이션에서 조인할 것. (2) supabase-js 호출은 항상 `{ data, error }`를 구조분해해서 `error`를 `console.error`로 남길 것 — 그래야 이런 실패가 "결과 0건"으로 위장되지 않는다.
+- **`useMemo` 안에서 `Math.random()`(정확히는 `shuffle()`)을 바로 호출하면 하드 리프레시 시 하이드레이션 에러가 난다**(2026-09-15, `/demo` 체험판을 실제 브라우저로 테스트하다 발견): `distractors.ts`의 `buildChoices`/`buildLetterTiles`는 내부적으로 `Math.random`을 쓰는데, 이걸 그냥 `useMemo(() => buildChoices(...), [...])`에 넣으면 서버 렌더 1번 + 클라이언트 하이드레이션 1번, 총 두 번 실행되면서 매번 다른 순서가 나와 "Text content did not match" 에러가 난다(새로고침·직접 URL 진입 시 재현, `Link`로 이동할 땐 서버 렌더를 다시 안 타서 재현 안 됨). `src/components/demo/DemoQuizSession.tsx`에서 `mounted` 상태(`useState(false)` + `useEffect(() => setMounted(true), [])`)로 감싸서 마운트 전엔 빈 값을, 마운트 후(클라이언트 전용)에만 실제로 섞은 값을 계산하도록 고쳐서 해결했다. **실 서비스의 `ChoiceSession.tsx`/`ArrangeSession.tsx`도 정확히 같은 패턴(`useMemo` 안에서 바로 shuffle 호출)이라 이론상 같은 버그가 있을 수 있음** — 자녀 실제 로그인으로 새로고침 재현 테스트가 필요해 별도 후속 작업으로 분리해뒀다(고칠 때는 `DemoQuizSession.tsx`의 `mounted` 패턴을 그대로 적용). **원칙**: 클라이언트 컴포넌트 렌더 함수(및 그 안의 `useMemo`/`useState` lazy initializer) 안에서 `Math.random()`/`Date.now()` 등 서버·클라이언트가 다른 값을 낼 수 있는 호출은 절대 직접 하지 말 것 — 반드시 `useEffect`(마운트 후, 클라이언트 전용)로 옮기거나 `mounted` 가드로 감쌀 것.

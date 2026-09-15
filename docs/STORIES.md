@@ -76,6 +76,10 @@
 - [x] 부모가 PIN 없이 `/profiles`의 "점검 미리보기" 링크로 특정 자녀의 복습/시험 화면을 그대로 써볼 수 있다.
 - 근거: [PRD.md](PRD.md) 4.9 / `src/lib/vocabAuth.ts`의 `resolveActingChild`
 
+### US-2.9 복습 모드 발음 음소거 (신규, 2026-09-15)
+- [x] 복습 모드에서 🔊/🔇 토글로 발음 재생을 켜고 끌 수 있다. 기기별 UI 취향이라 `localStorage`에만 저장(서버 동기화 없음).
+- 근거: [PRD.md](PRD.md) 4.11 / `src/lib/speech.ts`, `ReviewSession.tsx`
+
 ---
 
 ## 에픽 3. 인증/프로필 (자매 프로젝트 재사용)
@@ -156,3 +160,30 @@
 ### US-7.2 그 외 방어적 코딩/접근 제어 보강
 - [x] 시험 3종의 이중 제출/이중 넘어가기 방지, `getWordMarks` URL 길이 초과로 인한 조용한 실패 수정, 부모 홈 화면 접근 제어를 `/check`와 동일한 패턴으로 정리.
 - 근거: 위와 동일
+
+---
+
+## 에픽 8. 부모용 학습 현황 대시보드 (신규, 2026-09-15)
+
+### US-8.1 자녀별 학습 현황 요약
+- [x] 부모가 `/dashboard`에서 자녀별 카드(등록 단어/DAY 개수, 전체 정답률, 누적 별, ✅/🤔 개수, 마지막 활동)를 한눈에 본다. `/profiles`에서 진입.
+- 근거: [PRD.md](PRD.md) 4.11 / `src/app/dashboard/page.tsx`, `getChildDashboardStats`
+
+### US-8.2 자녀 1명 상세 현황
+- [x] 카드를 탭하면 `/dashboard/[childId]`에서 DAY별 진행 상황(단어 개수·⭐·✅·🤔)과 최근 학습 기록 15개를 본다.
+- 근거: [PRD.md](PRD.md) 4.11 / `src/app/dashboard/[childId]/page.tsx`, `getRecentAttempts`
+- 비고: 쌍둥이 간 순위/비교는 의도적으로 넣지 않음 — Phase 3 랭킹 보류 결정과 일관되게, 카드를 나열만 하고 비교 숫자는 만들지 않았다.
+
+---
+
+## 에픽 9. 회원가입 없이 체험하는 DAY 1 데모 (신규, 2026-09-15)
+
+### US-9.1 데모 진입
+- [x] `/login` 화면에서 "🎈 회원가입 없이 DAY 1 체험하기" 버튼으로 로그인 없이 `/demo` 허브(복습 + 시험 도전 3종)에 들어간다.
+- 근거: [PRD.md](PRD.md) 4.12 / `src/app/login/page.tsx`, `src/app/demo/page.tsx`
+
+### US-9.2 데모 복습/시험 체험
+- [x] 실제 능률보카 중등기본 DAY 01 단어 10개로 복습·타이핑·4지선다·글자 배열을 전부 체험할 수 있다. 로그인/DB 없이 클라이언트에서만 채점하고, 결과는 저장하지 않는다(1회성 체험). 각 결과 화면에 "가입하고 전체 단어장 시작하기" CTA가 있다.
+- 근거: [PRD.md](PRD.md) 4.12 / `src/components/demo/DemoReviewSession.tsx`, `DemoQuizSession.tsx`, `src/lib/demoWords.ts`
+
+---
