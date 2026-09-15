@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { shuffle } from "@/lib/distractors";
+import { buildLetterTiles } from "@/lib/distractors";
 import { SessionSummary, type WrongWord } from "@/components/SessionSummary";
 
 export interface ArrangeWord {
@@ -11,15 +11,6 @@ export interface ArrangeWord {
 }
 
 type Feedback = { status: "correct" | "incorrect"; correctAnswer: string } | null;
-
-// 점검 모드 — 글자 배열 응답. 정답 스펠링의 글자를 섞은 타일을 순서대로 탭해서 빈칸을 채운다.
-// 공백(구동사 등 "come from")은 채울 필요 없는 고정 칸으로 그대로 보여준다.
-function buildTiles(english: string) {
-  const chars = english.toLowerCase().split("");
-  const letterIndexes = chars.map((c, i) => (c === " " ? -1 : i)).filter((i) => i !== -1);
-  const tiles = shuffle(letterIndexes.map((i) => chars[i]));
-  return { chars, letterIndexes, tiles };
-}
 
 export function ArrangeSession({
   batchId,
@@ -43,7 +34,7 @@ export function ArrangeSession({
 
   const layout = useMemo(() => {
     if (!current) return null;
-    return buildTiles(current.english);
+    return buildLetterTiles(current.english);
   }, [current]);
 
   // 문제가 바뀔 때 배치 상태를 초기화한다(useMemo가 아니라 렌더 중 계산 — 리스트 길이가

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -67,6 +68,10 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-4 text-center text-sm text-soft">리딩버디와 같은 계정으로 로그인할 수 있어요.</p>
+
+        <Link href="/demo" className="btn btn-outline mb-0 mt-6">
+          🎈 회원가입 없이 DAY 1 체험하기
+        </Link>
       </div>
     </div>
   );

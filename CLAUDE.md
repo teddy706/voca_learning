@@ -148,6 +148,20 @@ Next.js 14.2.35(App Router) + TS + Tailwind로 초기화, `npm install`/`npm run
 
 점검 모드 상세는 위 "점검 모드 전면 재설계"·"부모 계정으로 자녀 화면 미리보기" 절 참고.
 
+### 복습 모드 발음 음소거 (2026-09-15 추가)
+사용자가 "필요에 따라 음소거하고 학습할 수 있게" 요청 — `src/lib/speech.ts`에 `isSpeechMuted()`/`setSpeechMuted()`(둘 다 `localStorage` 기반, private mode 등 접근 실패 시 try/catch로 무해하게 처리)를 추가하고 `speakEnglish()` 자체가 호출 시점에 음소거 여부를 확인하도록 만들었다 — 그래서 앞으로 시험 도전 화면에도 발음을 붙이면 자동으로 음소거가 적용된다(별도 배선 불필요). `ReviewSession.tsx`에 🔊/🔇 토글 버튼 추가(카운터 옆). 서버 데이터가 아니라 기기별 UI 취향이라 DB 컬럼/마이그레이션 없음.
+
+### 부모용 학습 현황 대시보드 (2026-09-15 추가)
+사용자가 "부모가 학습 현황을 볼 수 있는 대시보드"를 요청 — `/dashboard`(자녀별 카드: 단어/DAY 개수·정답률·⭐ 누적·✅/🤔·최근 활동)와 `/dashboard/[childId]`(DAY별 진행 상황 표 + 최근 학습 기록 15개)를 추가했다. `/profiles`에 진입 링크("📊 학습 현황 보기") 추가.
+- 새 쿼리 함수는 전부 `src/lib/vocabBatch.ts`에 추가(`getChildDashboardStats`, `getRecentAttempts`) — 기존 RLS(부모는 `family_id` 전체 조회 가능)를 그대로 쓰므로 새 마이그레이션 없음.
+- **의도적으로 뺀 것**: 쌍둥이 간 순위/비교 연출(예: "1등") — PRD 9장에서 랭킹은 Phase 3으로 보류하기로 한 결정과 일관되게, 카드를 나열만 하고 서로 비교하는 숫자는 만들지 않았다.
+
+### 회원가입 없이 체험하는 DAY 1 데모 (2026-09-15 추가)
+사용자가 "로그인 첫 화면에 DAY 1을 회원가입 없이 경험할 수 있는 데모"를 요청 — `/login`에 "🎈 회원가입 없이 DAY 1 체험하기" 버튼을 추가해 `/demo`(허브: 복습 + 시험 도전 3종)로 연결한다. `/demo/{review,typing,choice,arrange}` 4개 라우트 모두 로그인/DB 조회가 전혀 없는 순수 클라이언트 페이지다(middleware.ts는 라우트별 접근 제어를 하지 않으므로 별도 예외 처리 불필요).
+- **데모 단어**: `src/lib/demoWords.ts`에 실제 능률보카 중등기본 DAY 01(`voca_mp3/능률보카_중등기본_DAY_01_표제어_뜻_review.csv`)에서 뜻이 깨끗한 10개만 하드코딩(⚠️ 플래그 붙었거나 STT 오인식으로 뜻이 부자연스러운 항목은 첫인상용이라 제외). id는 `demo-` 접두사라 실제 `vocab_words.id`(uuid)와 절대 안 겹침.
+- **왜 실제 컴포넌트(ReviewSession/CheckSession/ChoiceSession/ArrangeSession)를 재사용하지 않았나**: 그 컴포넌트들은 `/api/vocab-attempts`·`/api/vocab-word-marks`·`/api/vocab-stars`로 서버 채점/저장을 하는데, 데모는 로그인 세션도 없고 단어 id도 DB에 없는 가짜라 그 API들이 애초에 동작할 수 없다. 그래서 `src/components/demo/DemoReviewSession.tsx`/`DemoQuizSession.tsx`를 새로 만들어 **채점을 전부 클라이언트에서** 하고 결과를 저장하지 않는다(1회성 체험이므로 서버 왕복이 원래 불필요). 디스트랙터 생성(`buildChoices`)과 글자 타일 생성 로직은 실제 로직과 100% 동일하게 만들려고 `src/lib/distractors.ts`로 옮겨 재사용했다(`buildLetterTiles` — 원래 `ArrangeSession.tsx` 안에 있던 `buildTiles`를 그대로 승격, 실제 화면도 이제 이 함수를 씀).
+- **하이드레이션 버그 발견 및 수정(2026-09-15, 브라우저로 직접 테스트하다 발견)**: `buildChoices`/`buildLetterTiles`는 `shuffle()`(Math.random 사용)을 쓰는데, 이걸 그냥 `useMemo`에 넣으면 서버 렌더 1번 + 클라이언트 하이드레이션 1번, 총 두 번 실행되면서 각각 다른 순서가 나와 "Text content did not match" 하이드레이션 에러가 났다(새로고침/직접 URL 진입 시 재현, `Link`로 이동할 때는 재현 안 됨 — 서버 렌더를 다시 안 타서). `DemoQuizSession.tsx`에서 `mounted` 상태(`useState(false)` + `useEffect(() => setMounted(true), [])`)로 감싸서 마운트 전엔 빈 값을, 마운트 후(클라이언트 전용)에만 실제로 섞은 값을 계산하도록 고쳤다. **주의**: 실제 서비스의 `ChoiceSession.tsx`/`ArrangeSession.tsx`도 정확히 같은 패턴(`useMemo` 안에서 바로 shuffle 호출)이라 이론상 같은 버그가 있을 수 있다 — 자녀 실제 로그인으로 새로고침 테스트가 필요해 이번 세션에서는 별도 후속 작업으로 분리해뒀다(고쳐야 하면 `DemoQuizSession.tsx`의 `mounted` 패턴을 그대로 적용).
+
 ### 보류 (이번 Phase 제외, 필요해지면 재검토)
 - 사진 업로드(Blob) + Azure OCR 연동
 - OCR 결과 확인/수정 UI

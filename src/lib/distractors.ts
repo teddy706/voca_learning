@@ -119,3 +119,15 @@ export function buildChoices(answer: string, pool: string[], optionCount = 4): s
   const distractors = generateDistractors(answer, pool, optionCount - 1);
   return shuffle([answer, ...distractors]);
 }
+
+/**
+ * 글자 배열(ArrangeSession) 모드용 — 정답 스펠링의 글자를 섞은 타일 배열을 만든다. 공백(구동사
+ * 등 "come from")은 채울 필요 없는 고정 칸으로 취급해 타일에서 뺀다. ArrangeSession.tsx와
+ * 데모(DemoQuizSession.tsx)가 동일한 로직을 쓰므로 여기 하나로 모아 재사용한다.
+ */
+export function buildLetterTiles(english: string) {
+  const chars = english.toLowerCase().split("");
+  const letterIndexes = chars.map((c, i) => (c === " " ? -1 : i)).filter((i) => i !== -1);
+  const tiles = shuffle(letterIndexes.map((i) => chars[i]));
+  return { chars, letterIndexes, tiles };
+}
