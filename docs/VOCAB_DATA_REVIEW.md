@@ -1,6 +1,8 @@
 # 단어 데이터 검토 결과 (2026-10-05)
 
 > **현재 상태: A~D 전부 수정 완료.** 남은 건 B의 ⚠️ 3건(helpful/straw/bill)뿐 — 책/음원 확인 필요. 최종 검증: 캐릭터 5명 × DAY 50개 모두 CSV와 DB 완전 일치(캐릭터당 **928단어** — 이후 사용자 커밋 `ec17516`에서 DAY 06 `knife`·DAY 07 `listen` 추가, DAY 05 `feel like` 뜻 수정, 남아있던 연속 중복 행 제거).
+>
+> **2차 점검(2026-10-05, DAY 11~50): DAY별 20개 기준으로 재정리 → 캐릭터당 1002단어.** 보카북 정답지(`MP3_stt/ground_truth_vocab.txt`)로 누락 표제어 78개 추가, 뜻 수정 28건, 중복 116행 삭제, ⚠️ 3건(helpful/straw/bill)도 해결. 남은 것: DAY 28(21개, `get off` 확인 필요), DAY 01(21개, 미점검). 상세는 CLAUDE.md "단어 데이터 2차 점검" 절.
 
 대상: `voca_mp3/*_review.csv` 50개(DAY 01~50), 완전 중복 행 제거 후 880행.
 DAY 10은 이미 수정 완료(`buy`→`by`, `drive`/`yesterday` 뜻 정리, `ride`/`low`/`hit`/`talk`/`parent` 추가) — 아래 목록에서 제외.
