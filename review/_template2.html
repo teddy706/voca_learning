@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DAY 11~50 점검</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mut:#777;--line:#e5e5e5;--acc:#4C6EF5;--add:#e7f5ff;--edit:#fff4d6;--del:#ffe3e3;--ok:#2f9e44;--bad:#e03131}
+@media (prefers-color-scheme:dark){:root{--bg:#16171a;--fg:#eee;--mut:#999;--line:#2c2d31;--add:#1b2a3a;--edit:#3a3220;--del:#3d2224}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,"Malgun Gothic",sans-serif}
+header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;z-index:2}
+h1{font-size:17px;margin:0 0 4px}
+.legend{font-size:12px;color:var(--mut);margin-bottom:8px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input[type=search],select{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit}
+input[type=search]{flex:1;min-width:140px}
+button{padding:6px 12px;border:1px solid var(--acc);border-radius:8px;background:var(--acc);color:#fff;font:inherit;cursor:pointer}
+button.ghost{background:transparent;color:var(--acc)}
+.stat{color:var(--mut);font-size:13px;margin-top:6px}
+main{padding:0 16px 80px;max-width:960px;margin:0 auto}
+h2{font-size:15px;margin:24px 0 4px;color:var(--acc)}
+h2 .cnt{font-size:13px;font-weight:normal}
+.cnt.good{color:var(--ok)}.cnt.warn{color:var(--bad)}
+.ask{background:var(--edit);border-radius:8px;padding:6px 10px;font-size:13px;margin:4px 0}
+table{width:100%;border-collapse:collapse}
+td{border-bottom:1px solid var(--line);padding:6px 4px;vertical-align:top}
+td.n{width:28px;color:var(--mut);font-size:12px}
+td.en{width:28%;font-weight:600}
+td.act{width:140px;text-align:right;white-space:nowrap}
+tr.k-add{background:var(--add)}tr.k-edit,tr.k-merge{background:var(--edit)}tr.k-del{background:var(--del)}
+tr.k-del td.en,tr.k-del td.ko .new{text-decoration:line-through;color:var(--mut)}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;border-radius:6px;margin-right:4px;border:1px solid currentColor}
+.old{display:block;font-size:12px;color:var(--mut);text-decoration:line-through}
+.why{display:block;font-size:12px;color:var(--mut)}
+.act button{padding:2px 8px;font-size:12px;margin-left:4px}
+.act button.on-ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.act button.on-bad{background:var(--bad);border-color:var(--bad);color:#fff}
+textarea.note{width:100%;margin-top:4px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+#out{position:fixed;inset:8% 16px auto;max-width:760px;margin:auto;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px;display:none;z-index:5;box-shadow:0 10px 40px #0004}
+#out textarea{width:100%;height:55vh;font:13px monospace;background:var(--bg);color:var(--fg)}
+@media (max-width:600px){td.act{width:auto}td.en{width:30%}}
+</style>
+</head>
+<body>
+<header>
+  <h1>능률보카 DAY 11~50 점검 (중복 제거 후)</h1>
+  <div class="legend">파란색: ➕ 추가 제안 · 노란색: ✏️ 뜻 수정/🔀 합치기 제안 · 빨간색: 🗑 삭제 제안 · 흰색: 기존 그대로.
+  제안 행은 ✅ 반영 / ❌ 반영 안 함, 기존 행은 ✅ 맞음 / ❌ 틀림. ❌을 누르면 메모 칸이 열려요.</div>
+  <div class="bar">
+    <input type="search" id="q" placeholder="영어/뜻 검색">
+    <select id="day"><option value="">전체 DAY</option></select>
+    <select id="f">
+      <option value="">전체</option>
+      <option value="prop">제안만</option>
+      <option value="todo">미점검만</option>
+      <option value="bad">❌만</option>
+    </select>
+    <button id="exp">결과 내보내기</button>
+  </div>
+  <div class="stat" id="stat"></div>
+</header>
+<main id="list"></main>
+<div id="out"><b>Claude에게 붙여넣을 점검 결과</b><textarea readonly id="outtxt"></textarea>
+<div class="bar" style="margin-top:8px"><button id="copy">복사</button><button class="ghost" id="close">닫기</button></div></div>
+<script>
+const DAYS=__DATA__;
+const KEY='vocab-review-11-50-v1';
+const LABEL={add:'➕ 추가',edit:'✏️ 수정',merge:'🔀 합치기',del:'🗑 삭제'};
+let S={};try{S=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const $=s=>document.querySelector(s);
+const pad=d=>String(d).padStart(2,'0');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const key=(d,r)=>d+':'+r.k+':'+r.en;
+DAYS.forEach(x=>$('#day').insertAdjacentHTML('beforeend',`<option value="${x.d}">DAY ${pad(x.d)}</option>`));
+function render(){
+  const q=$('#q').value.trim().toLowerCase(),dd=$('#day').value,f=$('#f').value;
+  let h='',shown=0,total=0,done=0,bad=0,props=0;
+  for(const x of DAYS){
+    let part='',n=0;
+    x.rows.forEach(r=>{
+      total++;if(r.k!=='keep')props++;
+      const st=S[key(x.d,r)]||{};if(st.s)done++;if(st.s==='bad')bad++;
+      if(r.k!=='del')n++;
+      if(dd&&+dd!==x.d)return;
+      if(q&&!(r.en.toLowerCase().includes(q)||r.ko.includes(q)||(r.old||'').includes(q)))return;
+      if(f==='prop'&&r.k==='keep')return;
+      if(f==='todo'&&st.s)return;
+      if(f==='bad'&&st.s!=='bad')return;
+      shown++;
+      const okL=r.k==='keep'?'✅ 맞음':'✅ 반영',badL=r.k==='keep'?'❌ 틀림':'❌ 아님';
+      part+=`<tr class="k-${r.k}" data-k="${esc(key(x.d,r))}"><td class="n">${r.k==='del'?'':n}</td>
+      <td class="en">${r.k!=='keep'?`<span class="badge">${LABEL[r.k]}</span><br>`:''}${esc(r.en)}</td>
+      <td class="ko"><span class="new">${esc(r.ko)}</span>${r.old?`<span class="old">${esc(r.old)}</span>`:''}${r.why?`<span class="why">근거: ${esc(r.why)}</span>`:''}
+      ${st.s==='bad'?`<textarea class="note" placeholder="어떻게 고쳐야 하나요?">${esc(st.note||'')}</textarea>`:''}</td>
+      <td class="act"><button class="ghost ${st.s==='ok'?'on-ok':''}" data-a="ok">${okL}</button><button class="ghost ${st.s==='bad'?'on-bad':''}" data-a="bad">${badL}</button></td></tr>`;
+    });
+    if(part){
+      const cls=x.final===20?'good':'warn';
+      h+=`<h2>DAY ${pad(x.d)} <span class="cnt ${cls}">원래 ${x.before}개 → 제안 반영 시 ${x.final}개${x.final===20?' ✓':' ⚠️'}</span></h2>`
+        +(x.ask?`<div class="ask">⚠️ ${esc(x.ask)}</div>`:'')+`<table>${part}</table>`;
+    }
+  }
+  $('#list').innerHTML=h||'<p class="stat">해당 단어 없음</p>';
+  $('#stat').textContent=`전체 ${total}행 (제안 ${props}건) · 표시 ${shown} · 점검 완료 ${done} · ❌ ${bad} · 미점검 ${total-done}`;
+}
+$('#list').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-a]');if(!b)return;
+  const k=b.closest('tr').dataset.k,a=b.dataset.a,st=S[k]||{};
+  st.s=st.s===a?undefined:a;S[k]=st;save();render();
+  if(st.s==='bad')document.querySelector(`tr[data-k="${CSS.escape(k)}"] textarea`)?.focus();
+});
+$('#list').addEventListener('input',e=>{
+  if(!e.target.matches('textarea.note'))return;
+  const k=e.target.closest('tr').dataset.k;(S[k]=S[k]||{}).note=e.target.value;save();
+});
+['#q','#day','#f'].forEach(s=>$(s).addEventListener('input',render));
+$('#exp').onclick=()=>{
+  const ok=[],no=[],todo=[],wrong=[];
+  for(const x of DAYS)x.rows.forEach(r=>{
+    const st=S[key(x.d,r)]||{},tag=`DAY ${pad(x.d)} ${r.en}`;
+    if(r.k==='keep'){if(st.s==='bad')wrong.push(`${tag} | ${r.ko} → ${st.note||'(메모 없음)'}`);return;}
+    const line=`${tag} [${LABEL[r.k]}] ${r.ko}`;
+    if(st.s==='ok')ok.push(line);else if(st.s==='bad')no.push(`${line} → ${st.note||'(메모 없음)'}`);else todo.push(line);
+  });
+  const sec=(t,a)=>a.length?`## ${t} (${a.length})\n${a.join('\n')}\n`:'';
+  $('#outtxt').value=[sec('제안 반영 ✅',ok),sec('제안 반영 안 함 ❌',no),sec('기존 단어 틀림 ❌',wrong),sec('제안 미결정',todo)].join('\n')||'점검 결과가 없어요.';
+  $('#out').style.display='block';
+};
+$('#copy').onclick=()=>{$('#outtxt').select();navigator.clipboard?.writeText($('#outtxt').value)};
+$('#close').onclick=()=>$('#out').style.display='none';
+render();
+</script>
+</body>
+</html>

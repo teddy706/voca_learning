@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { isSpeechMuted, setSpeechMuted, speakEnglish } from "@/lib/speech";
+import { primaryAnswer } from "@/lib/answerVariants";
 
 export interface ReviewWord {
   id: string;
@@ -70,7 +71,7 @@ export function ReviewSession({
   function toggleFlip() {
     const willShowEnglish = !flipped;
     setFlipped(willShowEnglish);
-    if (willShowEnglish) speakEnglish(current.english);
+    if (willShowEnglish) speakEnglish(primaryAnswer(current.english));
   }
 
   function next() {

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { buildChoices } from "@/lib/distractors";
+import { isAcceptedAnswer, primaryAnswer } from "@/lib/answerVariants";
 import { SessionSummary, type WrongWord } from "@/components/SessionSummary";
 
 export interface ChoiceWord {
@@ -35,10 +36,12 @@ export function ChoiceSession({
   const finished = index >= words.length;
 
   // 문제마다 보기를 한 번만 섞도록 세션 시작 시 전부 미리 계산해둔다(다시 렌더돼도 안 바뀌게).
+  // 보기는 표기 기호를 뺀 대표 답안으로 만든다("turn on[off]" → "turn on") — 서버 채점은 변형 답안을 모두 인정한다.
   const choicesByWord = useMemo(() => {
     return words.map((w) => {
-      const otherPool = pool.filter((p) => p.toLowerCase() !== w.english.toLowerCase());
-      return buildChoices(w.english, otherPool, 4);
+      const answer = primaryAnswer(w.english);
+      const otherPool = pool.map(primaryAnswer).filter((p) => p !== answer);
+      return buildChoices(answer, otherPool, 4);
     });
   }, [words, pool]);
 
@@ -117,7 +120,7 @@ export function ChoiceSession({
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {choices.map((choice) => {
           const isPicked = feedback?.picked === choice;
-          const isAnswer = feedback && choice === feedback.correctAnswer;
+          const isAnswer = feedback && isAcceptedAnswer(choice, feedback.correctAnswer);
           const style = !feedback
             ? "border-ink bg-white"
             : isAnswer

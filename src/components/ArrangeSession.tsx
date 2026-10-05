@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { buildLetterTiles } from "@/lib/distractors";
+import { primaryAnswer } from "@/lib/answerVariants";
 import { SessionSummary, type WrongWord } from "@/components/SessionSummary";
 
 export interface ArrangeWord {
@@ -34,7 +35,8 @@ export function ArrangeSession({
 
   const layout = useMemo(() => {
     if (!current) return null;
-    return buildLetterTiles(current.english);
+    // 표기 기호([ ], ( ), ...)가 타일로 섞이지 않게 대표 답안으로 만든다 — "all day (long)" → "all day long".
+    return buildLetterTiles(primaryAnswer(current.english));
   }, [current]);
 
   // 문제가 바뀔 때 배치 상태를 초기화한다(useMemo가 아니라 렌더 중 계산 — 리스트 길이가

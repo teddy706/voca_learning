@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>단어 목록 점검</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mut:#777;--line:#e5e5e5;--acc:#4C6EF5;--warn:#fff4d6;--bad:#ffe3e3;--ok:#e6f7ea}
+@media (prefers-color-scheme:dark){:root{--bg:#16171a;--fg:#eee;--mut:#999;--line:#2c2d31;--warn:#3a3220;--bad:#3d2224;--ok:#1f3326}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,"Malgun Gothic",sans-serif}
+header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;z-index:2}
+h1{font-size:17px;margin:0 0 8px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input[type=search],select{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit}
+input[type=search]{flex:1;min-width:160px}
+button{padding:6px 12px;border:1px solid var(--acc);border-radius:8px;background:var(--acc);color:#fff;font:inherit;cursor:pointer}
+button.ghost{background:transparent;color:var(--acc)}
+.stat{color:var(--mut);font-size:13px}
+main{padding:0 16px 80px;max-width:900px;margin:0 auto}
+h2{font-size:15px;margin:22px 0 6px;color:var(--acc)}
+table{width:100%;border-collapse:collapse}
+td{border-bottom:1px solid var(--line);padding:6px 4px;vertical-align:top}
+td.n{width:32px;color:var(--mut);font-size:12px}
+td.en{width:32%;font-weight:600}
+td.act{width:150px;text-align:right;white-space:nowrap}
+tr.flag{background:var(--warn)}
+tr.s-bad{background:var(--bad)}
+tr.s-ok td.en,tr.s-ok td.ko{color:var(--mut)}
+.tag{font-size:12px;color:#b26b00;display:block}
+.act button{padding:2px 8px;font-size:12px;margin-left:4px}
+.act button.on-ok{background:#2f9e44;border-color:#2f9e44}
+.act button.on-bad{background:#e03131;border-color:#e03131}
+textarea.note{width:100%;margin-top:4px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+#out{position:fixed;inset:10% 16px auto;max-width:760px;margin:auto;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px;display:none;z-index:5;box-shadow:0 10px 40px #0004}
+#out textarea{width:100%;height:50vh;font:13px monospace;background:var(--bg);color:var(--fg)}
+</style>
+</head>
+<body>
+<header>
+  <h1>능률보카 중등기본 단어 점검</h1>
+  <div class="bar">
+    <input type="search" id="q" placeholder="영어/뜻 검색">
+    <select id="day"><option value="">전체 DAY</option></select>
+    <select id="f">
+      <option value="">전체</option>
+      <option value="flag">⚠️ 확인필요만</option>
+      <option value="todo">미점검만</option>
+      <option value="bad">❌ 틀림 표시만</option>
+    </select>
+    <button id="exp">❌ 목록 내보내기</button>
+  </div>
+  <div class="stat" id="stat"></div>
+</header>
+<main id="list"></main>
+<div id="out"><b>Claude에게 붙여넣을 수정 목록</b><textarea readonly id="outtxt"></textarea>
+<div class="bar" style="margin-top:8px"><button id="copy">복사</button><button class="ghost" id="close">닫기</button></div></div>
+<script>
+const DAYS=__DATA__;
+const KEY='vocab-review-v1';
+let S={};try{S=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const id=(d,i)=>d+':'+i;
+const $=s=>document.querySelector(s);
+DAYS.forEach(([d])=>$('#day').insertAdjacentHTML('beforeend',`<option value="${d}">DAY ${String(d).padStart(2,'0')}</option>`));
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function render(){
+  const q=$('#q').value.trim().toLowerCase(),dd=$('#day').value,f=$('#f').value;
+  let h='',shown=0,total=0,ok=0,bad=0;
+  for(const [d,rows] of DAYS){
+    let part='';
+    rows.forEach(([en,ko,fl],i)=>{
+      total++;const st=S[id(d,i)]||{};if(st.s==='ok')ok++;if(st.s==='bad')bad++;
+      if(dd&&+dd!==d)return;
+      if(q&&!(en.toLowerCase().includes(q)||ko.includes(q)))return;
+      if(f==='flag'&&!fl.trim())return;
+      if(f==='todo'&&st.s)return;
+      if(f==='bad'&&st.s!=='bad')return;
+      shown++;
+      const cls=[fl.trim()?'flag':'',st.s?'s-'+st.s:''].join(' ');
+      part+=`<tr class="${cls}" data-k="${id(d,i)}"><td class="n">${i+1}</td><td class="en">${esc(en)}${fl.trim()?`<span class="tag">${esc(fl)}</span>`:''}</td>
+      <td class="ko">${esc(ko)}${st.s==='bad'?`<textarea class="note" placeholder="어떻게 고쳐야 하나요? (예: buy → by)">${esc(st.note||'')}</textarea>`:''}</td>
+      <td class="act"><button class="ghost ${st.s==='ok'?'on-ok':''}" data-a="ok">✅ 맞음</button><button class="ghost ${st.s==='bad'?'on-bad':''}" data-a="bad">❌ 틀림</button></td></tr>`;
+    });
+    if(part)h+=`<h2>DAY ${String(d).padStart(2,'0')} <span class="stat">(${rows.length}단어)</span></h2><table>${part}</table>`;
+  }
+  $('#list').innerHTML=h||'<p class="stat">해당 단어 없음</p>';
+  $('#stat').textContent=`전체 ${total}단어 · 표시 ${shown} · ✅ ${ok} · ❌ ${bad} · 미점검 ${total-ok-bad}`;
+}
+$('#list').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-a]');if(!b)return;
+  const k=b.closest('tr').dataset.k,a=b.dataset.a,st=S[k]||{};
+  if(st.s===a)delete st.s;else st.s=a;
+  S[k]=st;save();render();
+  if(a==='bad'&&st.s==='bad')document.querySelector(`tr[data-k="${k}"] textarea`)?.focus();
+});
+$('#list').addEventListener('input',e=>{
+  if(!e.target.matches('textarea.note'))return;
+  const k=e.target.closest('tr').dataset.k;(S[k]=S[k]||{}).note=e.target.value;save();
+});
+['#q','#day','#f'].forEach(s=>$(s).addEventListener('input',render));
+$('#exp').onclick=()=>{
+  const lines=[];
+  for(const [d,rows] of DAYS)rows.forEach(([en,ko],i)=>{const st=S[id(d,i)];if(st&&st.s==='bad')lines.push(`DAY ${String(d).padStart(2,'0')} #${i+1} ${en} | ${ko} → ${st.note||'(메모 없음)'}`)});
+  $('#outtxt').value=lines.length?lines.join('\n'):'❌ 표시한 단어가 없어요.';$('#out').style.display='block';
+};
+$('#copy').onclick=()=>{$('#outtxt').select();navigator.clipboard?.writeText($('#outtxt').value)};
+$('#close').onclick=()=>$('#out').style.display='none';
+render();
+</script>
+</body>
+</html>

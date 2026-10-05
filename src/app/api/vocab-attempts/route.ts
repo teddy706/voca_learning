@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { resolveActingChild } from "@/lib/vocabAuth";
+import { isAcceptedAnswer } from "@/lib/answerVariants";
 
 // 채점은 서버에서 한다 — 클라이언트가 보낸 is_correct를 그대로 믿지 않고, 정답(vocab_words.english)을
 // 직접 조회해 trim + 대소문자 무시로 비교한다(PRD 4.3). 이렇게 하면 devtools로 값을 조작해도
-// vocab_attempts 기록과 화면 피드백이 항상 서버 판정과 일치한다.
-function normalize(value: string) {
-  return value.trim().toLowerCase();
-}
+// vocab_attempts 기록과 화면 피드백이 항상 서버 판정과 일치한다. 책 표기("turn on[off]",
+// "all day (long)")는 isAcceptedAnswer가 변형 답안을 모두 인정한다.
 
 export async function POST(request: Request) {
   const { childId, wordId, userInput, mode, answerMode } = await request.json();
@@ -41,7 +40,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "단어를 찾을 수 없어요." }, { status: 404 });
   }
 
-  const isCorrect = normalize(userInput) === normalize(word.english);
+  const isCorrect = isAcceptedAnswer(userInput, word.english);
 
   const { error } = await supabase.from("vocab_attempts").insert({
     family_id: child.family_id,
