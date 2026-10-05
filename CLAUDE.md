@@ -124,6 +124,15 @@ OCR은 `src/lib/documentIntelligence.ts`의 `analyzeImage()` REST 폴링 패턴�
 ### 학습 진행 기록 초기화 (2026-09-14, 1회성 운영 작업)
 배포/테스트가 어느 정도 정리된 시점에 사용자가 4명 캐릭터(고아린/황유니/아빠/정보라) 전체의 진행 기록 초기화를 요청 — `vocab_attempts`(7건)/`vocab_word_marks`(23건) 삭제(`vocab_stars`는 원래 0건). **`vocab_words`/`vocab_batches`(등록된 단어장 자체)는 그대로 둠** — CSV 재가져오기 불필요. family_id로 스코프해서 REST API(service role)로 직접 삭제, 코드 변경은 없음(일회성 운영 작업이라 스크립트로 안 남김). 앞으로 또 초기화가 필요하면 같은 방식(3개 테이블을 family_id 또는 child_id로 delete)을 반복하면 된다.
 
+### 단어 데이터(CSV) STT 오류 일괄 정리 (2026-10-05)
+사용자가 "buy가 아니라 by 같다"고 지적한 걸 계기로 DAY 01~50 전체를 검토 — CSV가 오디오 STT 결과라 오류가 생각보다 훨씬 많았다. 전체 목록·수정 내역은 [docs/VOCAB_DATA_REVIEW.md](docs/VOCAB_DATA_REVIEW.md), 커밋 `bb853b1`.
+- **고친 것**: (A) 영어 자체가 틀림(buy→by, to→too, roll→role, board→bored, poor→pour, merry→marry, style→sea+center, 숙어 쪼개짐/뜻 뒤섞임, DAY 40 마침표 붙은 중복 11개 삭제 — 이건 정답을 쳐도 오답 처리되던 실제 버그), (B) 다음 단어들의 뜻이 앞 단어 뜻에 합쳐져 **표제어 56개가 통째로 누락**돼 있던 것 복원(예: `plastic` 뜻 칸에 report/recycle/invite… 8단어 뜻이 들어있었음), (C) 뜻 오타(배다→베다, 장례→장래 등)와 "무언 무엇"/"무엇뭐"→"무엇 무엇", (D) ①②를 읽은 "일, … 이, …"가 뜻에 섞인 48행, (E) DAY 27 대문자. 결과: 캐릭터당 876→**925단어**.
+- **⚠️ 남은 확인 필요 4건**: `balloon`/`helpful`/`straw`/`bill` — 섞인 뜻의 표제어를 확정 못 해서 원래 단어에 남겨두고 CSV `확인필요` 열에 ⚠️. 사용자가 책/음원으로 확인해주면 같은 방식으로 분리.
+- **DB 반영 원칙**: 기존 `vocab_words` 행은 **삭제 후 재생성이 아니라 id를 유지한 채 PATCH**(학습 기록 `vocab_attempts`/`vocab_word_marks`가 `on delete cascade`라 지우면 같이 사라짐). 삭제는 학습 기록 0건을 먼저 확인한 행만. 새 단어는 upsert 후 `vocab_batch_items`를 `on_conflict=batch_id,word_id`로 upsert해 CSV 순서대로 position 재정렬. 마지막에 캐릭터×DAY 전부 CSV↔DB 완전 일치 검증.
+- **⚠️ 함정 — CSV를 고쳐도 `import_vocab_csv.py` 재실행으로는 반영 안 됨**: 스크립트는 이미 아이템이 있는 배치를 건너뛴다. CSV 수정 시엔 DB도 직접 맞춰야 한다(위 원칙대로). 이번 작업용 스크립트는 일회성이라 저장소에 안 남김.
+- **CSV는 두 벌**: 스크립트가 읽는 건 이 저장소의 `voca_mp3/*_review.csv`(git 추적), 원본 작업 디렉터리 `../MP3_stt/voca_mp3/`에도 같은 파일이 있다 — 둘 다 같이 고쳤음. 파일은 **CRLF 줄바꿈 + UTF-8 BOM**이니 편집 시 유지할 것(LF로 바뀌면 diff가 파일 전체로 잡힘).
+- **새 캐릭터 "도로시 유키"(role=child, 5번째)**: 2026-10-05 사용자가 `import_vocab_csv.py`를 직접 실행해 DAY 01~50 등록 — 스크립트가 family_id로 동적 조회해서 자동 포함됨(위 "실제 계정 정보" 교훈대로 정상 동작 확인).
+
 ### 앱 스캐폴딩 현황 (2026-09-14)
 Next.js 14.2.35(App Router) + TS + Tailwind로 초기화, `npm install`/`npm run build`/`npx tsc --noEmit` 전부 통과 확인. 만든 것:
 - **인프라**: `package.json`(리딩버디와 동일 핵심 의존성), `tsconfig.json`/`next.config.mjs`/`tailwind.config.ts`(자체 accent 컬러 `#4C6EF5`)/`postcss.config.mjs`/`.eslintrc.json`/`vitest.config.mts`/`vercel.json`(`regions: ["icn1"]`)/`.claude/launch.json`(dev 서버 프리뷰용)
